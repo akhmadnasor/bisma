@@ -68,6 +68,7 @@ export interface AppConfig {
   logoUrl3x4: string;
   logoUrl4x3: string;
   letterHeadUrl: string; // Kop Surat
+  announcementColor: 'yellow' | 'blue' | 'green' | 'pink' | 'purple'; // New Field
   customMenus: { label: string; url: string; icon: string }[];
 }
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   BookOpen, Award, Calendar, 
   LogOut, Star, Recycle, FileText, Wallet, ArrowUpRight,
-  Sun, Moon, Utensils, Heart, Users, CheckCircle, ArrowLeft, Clock, X, AlertTriangle, Trophy, Home, Bot, DoorOpen, Send, ListChecks
+  Sun, Moon, Utensils, Heart, Users, CheckCircle, ArrowLeft, Clock, X, AlertTriangle, Trophy, Home, Bot, DoorOpen, Send, ListChecks, PenTool
 } from 'lucide-react';
 import { Task } from '../types';
 
@@ -42,44 +42,62 @@ const StudentDashboard: React.FC<StudentProps> = ({ onLogout }) => {
 
   const renderTasks = () => (
       <div className="min-h-screen bg-[#F0F9FF] font-sans">
-          <header className="bg-blue-500 p-6 text-white flex items-center gap-4 shadow-lg sticky top-0 z-30">
+          <header className="bg-blue-500 p-6 text-white flex items-center gap-4 shadow-lg sticky top-0 z-30 rounded-b-3xl">
               <button onClick={() => setActiveView('dashboard')} className="p-2 bg-white/20 rounded-full hover:bg-white/30"><ArrowLeft className="w-5 h-5"/></button>
-              <h1 className="font-bold text-lg">Tugas Sekolah</h1>
+              <h1 className="font-bold text-lg">Buku Tugas</h1>
           </header>
           
           <div className="p-4">
-              <div className="flex bg-white rounded-xl p-1 mb-6 shadow-sm">
-                  <button onClick={() => setTaskTab('active')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${taskTab === 'active' ? 'bg-blue-100 text-blue-600' : 'text-gray-400'}`}>Tugas Hari Ini</button>
-                  <button onClick={() => setTaskTab('resume')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${taskTab === 'resume' ? 'bg-blue-100 text-blue-600' : 'text-gray-400'}`}>Riwayat</button>
+              <div className="flex bg-white rounded-full p-1 mb-6 shadow-sm border border-blue-100 max-w-xs mx-auto">
+                  <button onClick={() => setTaskTab('active')} className={`flex-1 py-2 text-sm font-bold rounded-full transition-all ${taskTab === 'active' ? 'bg-blue-100 text-blue-600' : 'text-gray-400'}`}>Tugas Aktif</button>
+                  <button onClick={() => setTaskTab('resume')} className={`flex-1 py-2 text-sm font-bold rounded-full transition-all ${taskTab === 'resume' ? 'bg-blue-100 text-blue-600' : 'text-gray-400'}`}>Selesai</button>
               </div>
 
               {taskTab === 'active' ? (
-                  <div className="space-y-4 pb-24">
+                  <div className="space-y-6 pb-24">
                       {activeTasks.map(t => (
-                          <div key={t.id} className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100">
-                              <div className="flex justify-between items-start mb-2">
-                                  <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase">{t.subject}</span>
-                                  <span className="text-xs text-red-500 font-bold">{t.deadline}</span>
+                          <div key={t.id} className="bg-yellow-50 p-0 rounded-3xl shadow-md border-b-4 border-yellow-200 overflow-hidden relative group">
+                              {/* Tape Effect */}
+                              <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-32 h-6 bg-white/30 backdrop-blur-sm rotate-2 shadow-sm border border-white/20"></div>
+
+                              <div className="p-6">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs border-2 border-white">{t.subject.substring(0,2)}</div>
+                                        <span className="text-sm font-bold text-gray-700">{t.subject}</span>
+                                    </div>
+                                    <span className="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-bold rounded-full border border-red-200">Deadline: {t.deadline}</span>
+                                </div>
+                                <h3 className="font-black text-gray-800 text-xl mb-2">{t.title}</h3>
+                                <p className="text-sm text-gray-600 mb-4 bg-white/50 p-3 rounded-xl border border-yellow-100 italic">
+                                    "{t.description}"
+                                </p>
+                                
+                                <div className="space-y-3">
+                                    <input type="text" placeholder="Tempel Link Tugas Disini..." className="w-full p-3 bg-white border border-gray-200 rounded-xl text-sm focus:border-blue-400 focus:ring-0 outline-none" />
+                                    <button onClick={() => handleTaskSubmit(t.id)} className="w-full py-3 bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-blue-600">
+                                        <Send className="w-4 h-4"/> Kumpulkan Tugas
+                                    </button>
+                                </div>
                               </div>
-                              <h3 className="font-bold text-gray-800 text-lg mb-1">{t.title}</h3>
-                              <p className="text-sm text-gray-600 mb-4">{t.description}</p>
-                              <div className="bg-gray-50 p-3 rounded-xl mb-4">
-                                  <input type="text" placeholder="Link Tugas (Google Drive/Youtube)..." className="w-full p-2 bg-white border rounded-lg text-sm mb-2" />
-                                  <textarea placeholder="Jawaban / Catatan..." className="w-full p-2 bg-white border rounded-lg text-sm h-20" />
-                              </div>
-                              <button onClick={() => handleTaskSubmit(t.id)} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                                  <Send className="w-4 h-4"/> Kirim Tugas
-                              </button>
                           </div>
                       ))}
-                      {activeTasks.length === 0 && <div className="text-center text-gray-400 mt-10">Hore! Tidak ada tugas aktif.</div>}
+                      {activeTasks.length === 0 && (
+                          <div className="text-center py-10">
+                              <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                                  <Star className="w-12 h-12 text-green-500 fill-green-500"/>
+                              </div>
+                              <h3 className="font-bold text-gray-600">Hore! Tugas Kosong</h3>
+                              <p className="text-xs text-gray-400">Kamu sudah mengerjakan semuanya.</p>
+                          </div>
+                      )}
                   </div>
               ) : (
                   <div className="space-y-3 pb-24">
                       {completedTasks.map(t => (
                           <div key={t.id} className="bg-white p-4 rounded-xl border border-gray-100 opacity-70">
                               <div className="flex justify-between">
-                                  <div className="font-bold text-gray-700">{t.title}</div>
+                                  <div className="font-bold text-gray-700 line-through">{t.title}</div>
                                   <CheckCircle className="w-5 h-5 text-green-500"/>
                               </div>
                               <div className="text-xs text-gray-500 mt-1">{t.subject} • Terkirim</div>
@@ -144,7 +162,7 @@ const StudentDashboard: React.FC<StudentProps> = ({ onLogout }) => {
             <h3 className="font-bold text-gray-800 mb-4 text-lg px-1">Menu Utama</h3>
             <div className="grid grid-cols-3 gap-4">
                 {[
-                  { id: 'tasks', label: 'Tugas', icon: ListChecks, color: 'from-red-400 to-red-600', shadow: 'shadow-red-200' }, // NEW
+                  { id: 'tasks', label: 'Tugas', icon: PenTool, color: 'from-red-400 to-red-600', shadow: 'shadow-red-200' }, 
                   { id: 'jadwal', label: 'Jadwal', icon: Calendar, color: 'from-blue-400 to-blue-600', shadow: 'shadow-blue-200' },
                   { id: 'prestasi', label: 'Prestasi', icon: Award, color: 'from-purple-400 to-purple-600', shadow: 'shadow-purple-200' },
                   { id: 'anak_hebat', label: 'Anak Hebat', icon: Star, color: 'from-yellow-400 to-yellow-600', shadow: 'shadow-yellow-200' },

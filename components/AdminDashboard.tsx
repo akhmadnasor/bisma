@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, CreditCard, Megaphone, FileText, 
   LayoutDashboard, UserPlus, GraduationCap, DollarSign,
@@ -7,9 +7,10 @@ import {
   Eye, EyeOff, KeyRound, Lock, Settings, Calendar, School,
   FileSpreadsheet, Mail, Star, Filter, Download, CheckSquare, Square,
   Globe, MessageCircle, Menu, ExternalLink, Clock, Upload, Database, Key, Server,
-  Recycle, LayoutTemplate, Trophy, ArrowLeft
+  Recycle, LayoutTemplate, Trophy, ArrowLeft, Palette, Info
 } from 'lucide-react';
 import { AppConfig, TrashTransaction } from '../types';
+import { supabase } from '../services/supabase';
 
 interface AdminProps {
   onLogout: () => void;
@@ -130,6 +131,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       logoUrl3x4: 'https://via.placeholder.com/300x400',
       logoUrl4x3: 'https://via.placeholder.com/400x300',
       letterHeadUrl: 'https://via.placeholder.com/800x200?text=KOP+SURAT+SEKOLAH',
+      announcementColor: 'yellow',
       customMenus: []
   });
 
@@ -150,6 +152,46 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       isEkstra: false,
       customSubject: ''
   });
+
+  // Load Data from Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+        try {
+            // Fetch Students (Example Implementation)
+            const { data: sData } = await supabase.from('students').select('*');
+            if (sData && sData.length > 0) {
+                const mappedStudents = sData.map((s: any) => ({
+                    id: s.id,
+                    name: s.name,
+                    nisn: s.nisn || s.id.toString(),
+                    class: s.class_name || '1A',
+                    status: 'Active',
+                    spp_status: 'Lunas',
+                    password: 'siswa'
+                }));
+                setStudents(mappedStudents);
+            }
+
+            // Fetch Teachers
+            const { data: tData } = await supabase.from('teachers').select('*');
+            if (tData && tData.length > 0) {
+                const mappedTeachers = tData.map((t: any) => ({
+                    id: t.id,
+                    name: t.name,
+                    nip: t.nip || '-',
+                    subject: 'Guru Kelas',
+                    status: 'Active',
+                    password: 'guru',
+                    wali_kelas: '-'
+                }));
+                setTeachers(mappedTeachers);
+            }
+        } catch (e) {
+            console.error("Error fetching data from Supabase, utilizing mock data.", e);
+        }
+    };
+    fetchData();
+  }, []);
 
   // --- Handlers ---
   const handleDelete = (id: number, type: 'student' | 'teacher' | 'schedule') => {
@@ -257,21 +299,25 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
     }));
   };
 
+  const handleSaveConfig = () => {
+      alert("Perubahan konfigurasi berhasil disimpan!");
+  };
+
   // --- Renderers ---
 
   const renderOverview = () => (
       <div className="space-y-6 animate-fade-in-up">
-          {/* Reward Guru Widget */}
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+          {/* Reward Guru Widget - Updated to Blue/Green */}
+          <div className="bg-gradient-to-r from-blue-600 to-emerald-500 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
               <div className="relative z-10">
-                  <h3 className="font-black text-2xl flex items-center gap-2 mb-4"><Trophy className="w-8 h-8"/> REWARD GURU TERBAIK</h3>
+                  <h3 className="font-black text-2xl flex items-center gap-2 mb-4"><Trophy className="w-8 h-8 text-yellow-300"/> REWARD GURU TERBAIK</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {TEACHER_LEADERBOARD.map((t, i) => (
-                          <div key={i} className="bg-white/20 backdrop-blur-md rounded-xl p-4 flex items-center gap-3 border border-white/30">
-                              <div className="font-black text-4xl opacity-50">#{i+1}</div>
+                          <div key={i} className="bg-white/10 backdrop-blur-md rounded-xl p-4 flex items-center gap-3 border border-white/20">
+                              <div className="font-black text-4xl opacity-50 text-blue-100">#{i+1}</div>
                               <div>
-                                  <div className="font-bold text-lg">{t.name}</div>
-                                  <div className="text-xs opacity-90">{t.class} • {t.poin} Poin Keaktifan</div>
+                                  <div className="font-bold text-lg text-white">{t.name}</div>
+                                  <div className="text-xs text-blue-50 opacity-90">{t.class} • {t.poin} Poin Keaktifan</div>
                               </div>
                           </div>
                       ))}
@@ -349,33 +395,77 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       </div>
   );
 
-  const renderAppConfig = () => (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in-up">
-          <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
-              <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><LayoutTemplate className="w-5 h-5"/> Identitas Aplikasi</h3>
-              <div><label className="text-xs font-bold text-gray-500">Nama Aplikasi</label><input type="text" value={appConfig.appName} onChange={e=>setAppConfig({...appConfig, appName: e.target.value})} className="w-full p-3 border rounded-xl"/></div>
-              <div><label className="text-xs font-bold text-gray-500">Nama Sekolah</label><input type="text" value={appConfig.schoolName} onChange={e=>setAppConfig({...appConfig, schoolName: e.target.value})} className="w-full p-3 border rounded-xl"/></div>
-              <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 1:1</label><div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl1x1} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl1x1} onChange={e=>setAppConfig({...appConfig, logoUrl1x1: e.target.value})}/></div>
-                  <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 3:4</label><div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl3x4} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl3x4} onChange={e=>setAppConfig({...appConfig, logoUrl3x4: e.target.value})}/></div>
-                  <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 4:3</label><div className="aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl4x3} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl4x3} onChange={e=>setAppConfig({...appConfig, logoUrl4x3: e.target.value})}/></div>
+  const renderAppConfig = () => {
+    const announcementColors = [
+      { name: 'Kuning (Default)', value: 'yellow', class: 'bg-yellow-50 text-yellow-600 border-yellow-200' },
+      { name: 'Biru', value: 'blue', class: 'bg-blue-50 text-blue-600 border-blue-200' },
+      { name: 'Hijau', value: 'green', class: 'bg-green-50 text-green-600 border-green-200' },
+      { name: 'Pink', value: 'pink', class: 'bg-pink-50 text-pink-600 border-pink-200' },
+      { name: 'Ungu', value: 'purple', class: 'bg-purple-50 text-purple-600 border-purple-200' },
+    ];
+
+    return (
+      <div className="animate-fade-in-up space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                  <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><LayoutTemplate className="w-5 h-5"/> Identitas Aplikasi</h3>
+                  <div><label className="text-xs font-bold text-gray-500">Nama Aplikasi</label><input type="text" value={appConfig.appName} onChange={e=>setAppConfig({...appConfig, appName: e.target.value})} className="w-full p-3 border rounded-xl"/></div>
+                  <div><label className="text-xs font-bold text-gray-500">Nama Sekolah</label><input type="text" value={appConfig.schoolName} onChange={e=>setAppConfig({...appConfig, schoolName: e.target.value})} className="w-full p-3 border rounded-xl"/></div>
+                  
+                  {/* Color Settings for Announcement */}
+                  <div className="pt-2">
+                      <label className="text-xs font-bold text-gray-500 flex items-center gap-1 mb-2"><Palette className="w-3 h-3"/> Tema Warna Pengumuman</label>
+                      <div className="flex gap-2 flex-wrap">
+                          {announcementColors.map(c => (
+                              <button 
+                                key={c.value}
+                                onClick={() => setAppConfig({...appConfig, announcementColor: c.value as any})}
+                                className={`px-3 py-2 rounded-lg border text-xs font-bold transition-all ${appConfig.announcementColor === c.value ? 'ring-2 ring-offset-1 ring-gray-400 ' + c.class : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                              >
+                                {c.name}
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 pt-2">
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 1:1</label><div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl1x1} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl1x1} onChange={e=>setAppConfig({...appConfig, logoUrl1x1: e.target.value})}/></div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 3:4</label><div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl3x4} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl3x4} onChange={e=>setAppConfig({...appConfig, logoUrl3x4: e.target.value})}/></div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 4:3</label><div className="aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl4x3} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl4x3} onChange={e=>setAppConfig({...appConfig, logoUrl4x3: e.target.value})}/></div>
+                  </div>
+              </div>
+              <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                  <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Globe className="w-5 h-5"/> Menu Tambahan (Custom)</h3>
+                  {appConfig.customMenus.map((m, i) => (
+                      <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><Globe className="w-4 h-4"/></div>
+                              <div><div className="font-bold text-sm">{m.label}</div><div className="text-[10px] text-gray-400 truncate w-32">{m.url}</div></div>
+                          </div>
+                          <button onClick={() => { const newMenus = [...appConfig.customMenus]; newMenus.splice(i, 1); setAppConfig({...appConfig, customMenus: newMenus}); }} className="p-1 text-red-500 hover:bg-red-50 rounded"><X className="w-4 h-4"/></button>
+                      </div>
+                  ))}
+                  <button onClick={handleAddCustomMenu} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-bold hover:bg-gray-50 flex items-center justify-center gap-2"><Plus className="w-4 h-4"/> Tambah Menu URL</button>
               </div>
           </div>
-          <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
-              <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Globe className="w-5 h-5"/> Menu Tambahan (Custom)</h3>
-              {appConfig.customMenus.map((m, i) => (
-                  <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><Globe className="w-4 h-4"/></div>
-                          <div><div className="font-bold text-sm">{m.label}</div><div className="text-[10px] text-gray-400 truncate w-32">{m.url}</div></div>
-                      </div>
-                      <button onClick={() => { const newMenus = [...appConfig.customMenus]; newMenus.splice(i, 1); setAppConfig({...appConfig, customMenus: newMenus}); }} className="p-1 text-red-500 hover:bg-red-50 rounded"><X className="w-4 h-4"/></button>
+
+          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3 text-gray-500">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                      <Info className="w-5 h-5"/> 
                   </div>
-              ))}
-              <button onClick={handleAddCustomMenu} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-bold hover:bg-gray-50 flex items-center justify-center gap-2"><Plus className="w-4 h-4"/> Tambah Menu URL</button>
+                  <div className="text-xs">
+                      <strong className="block text-gray-700">Perhatian Admin</strong>
+                      Pastikan data identitas sekolah dan warna tema sudah sesuai sebelum menyimpan.
+                  </div>
+              </div>
+              <button onClick={handleSaveConfig} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                  <Save className="w-5 h-5" /> Simpan Perubahan
+              </button>
           </div>
       </div>
-  );
+    );
+  }
 
   const renderFinance = () => (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
