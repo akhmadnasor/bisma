@@ -1,9 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize the client with the API key from environment variables
-// Note: In a production React app, this usually requires a backend proxy to hide the key,
-// or strictly restricted API key settings in Google Cloud Console if used client-side.
-const apiKey = process.env.API_KEY;
+// Initialize the client with the API key from environment variables.
+// SAFETY: Check if process is defined to avoid ReferenceError in some browser environments (Netlify/Vite)
+const getApiKey = () => {
+  try {
+    return process.env.API_KEY;
+  } catch (e) {
+    // In strict browser environments without polyfills, accessing process might fail.
+    // Return undefined so the app loads, but AI features will alert the user.
+    return undefined;
+  }
+};
+
+const apiKey = getApiKey();
 
 // Only initialize if key exists to prevent immediate crash, handle null check in function
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
@@ -15,7 +24,7 @@ export interface ChatMessage {
 
 export const sendMessageToGemini = async (message: string): Promise<string> => {
   if (!ai) {
-    return "Maaf, API Key Gemini belum dikonfigurasi. Mohon cek environment variable process.env.API_KEY.";
+    return "Maaf, API Key Gemini belum dikonfigurasi. Mohon tambahkan 'API_KEY' di Environment Variables Netlify Anda.";
   }
 
   try {
