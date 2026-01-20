@@ -1,0 +1,7 @@
+{
+  "name": "BISMA - Monitoring KBM",
+  "description": "A comprehensive school activity monitoring system for teachers featuring journal entry, attendance tracking, and real-time dashboards.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
