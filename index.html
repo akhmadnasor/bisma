@@ -15,28 +15,37 @@
               ramping: ['Roboto Condensed', 'sans-serif'],
             },
             colors: {
-              primary: '#5865F2',    // Blurple
-              success: '#57F287',    // Green
-              warning: '#FEE75C',    // Yellow
-              pink: '#EB459E',       // Fuchsia
-              danger: '#ED4245',     // Red
+              primary: '#0F2167',    // Deep Navy Blue
+              secondary: '#FFD369',  // Gold/Yellow
+              success: '#059669',    // Deep Green
+              warning: '#D97706',    // Amber/Gold Strong
+              pink: '#BE185D',       // Strong Pink
+              danger: '#DC2626',     // Strong Red
               surface: '#FFFFFF',    // White
-              dark: '#23272A',       // Dark Gray
+              dark: '#111827',       // Dark Gray/Black
             },
             animation: {
-              blob: "blob 7s infinite",
               'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
+              'float-1': 'floatUp 8s ease-in-out infinite',
+              'float-2': 'floatDown 12s ease-in-out infinite',
+              'gold-shimmer': 'goldShimmer 3s infinite alternate',
             },
             keyframes: {
-              blob: {
-                "0%": { transform: "translate(0px, 0px) scale(1)" },
-                "33%": { transform: "translate(30px, -50px) scale(1.1)" },
-                "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
-                "100%": { transform: "translate(0px, 0px) scale(1)" },
-              },
               fadeInUp: {
                 '0%': { opacity: '0', transform: 'translateY(20px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              floatUp: {
+                '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+                '50%': { transform: 'translateY(-40px) rotate(180deg)' },
+              },
+              floatDown: {
+                '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+                '50%': { transform: 'translateY(40px) rotate(-90deg)' },
+              },
+              goldShimmer: {
+                '0%': { filter: 'drop-shadow(0 0 2px #B8860B) brightness(1)' },
+                '100%': { filter: 'drop-shadow(0 0 15px #FFD700) brightness(1.2)' }
               }
             },
           }
@@ -45,33 +54,26 @@
     </script>
     <style>
       body {
-        background-color: #F8F9FD;
-        color: #23272A;
+        background-color: #F1F5F9;
+        color: #111827;
         overflow-x: hidden;
       }
       
-      /* Modern Glassmorphism */
       .glass-panel {
-        background: rgba(255, 255, 255, 0.65);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.8);
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 1);
+        box-shadow: 0 20px 60px -15px rgba(15, 33, 103, 0.2);
       }
 
-      /* Scrollbar Styling */
-      ::-webkit-scrollbar {
-        width: 8px;
+      /* Scrollbar Hide */
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
       }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
+      .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
       }
     </style>
   <script type="importmap">
@@ -89,17 +91,6 @@
 </head>
   <body class="antialiased min-h-screen relative selection:bg-primary selection:text-white">
     <div id="root" class="relative z-10"></div>
-    
-    <!-- Modern Organic Background Blobs -->
-    <div class="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden">
-        <!-- Blurple Blob -->
-        <div class="absolute top-0 -left-4 w-72 h-72 bg-primary rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <!-- Pink Blob -->
-        <div class="absolute top-0 -right-4 w-72 h-72 bg-pink rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        <!-- Yellow Blob -->
-        <div class="absolute -bottom-8 left-20 w-72 h-72 bg-warning rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
-    </div>
-    <!-- Entry Point for React -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

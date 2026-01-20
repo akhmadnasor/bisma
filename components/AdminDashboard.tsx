@@ -128,7 +128,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       appName: 'BISMA APP',
       schoolName: 'SDN BAUJENG 1',
       logoUrl1x1: 'https://via.placeholder.com/100',
-      logoUrl3x4: 'https://via.placeholder.com/300x400',
+      logoUrl3x4: 'https://i.imghippo.com/files/kldd1383bkc.png', // NEW DEFAULT UPDATED
       logoUrl4x3: 'https://via.placeholder.com/400x300',
       letterHeadUrl: 'https://via.placeholder.com/800x200?text=KOP+SURAT+SEKOLAH',
       announcementColor: 'yellow',
@@ -430,7 +430,24 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
 
                   <div className="grid grid-cols-3 gap-2 pt-2">
                       <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 1:1</label><div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl1x1} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl1x1} onChange={e=>setAppConfig({...appConfig, logoUrl1x1: e.target.value})}/></div>
-                      <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 3:4</label><div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl3x4} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl3x4} onChange={e=>setAppConfig({...appConfig, logoUrl3x4: e.target.value})}/></div>
+                      
+                      {/* Logo 3:4 Updated with Neon Glow & Breathing Animation */}
+                      <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-500 mb-1 block">Logo 3:4 (Portrait)</label>
+                          <div className="relative group w-full aspect-[3/4]">
+                              {/* Glow Effect */}
+                              <div className="absolute -inset-2 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500 animate-pulse-glow"></div>
+                              
+                              {/* Frame removed, just image and shadow */}
+                              <img 
+                                  src={appConfig.logoUrl3x4} 
+                                  className="relative w-full h-full object-cover rounded-xl drop-shadow-xl animate-fade-in-up" 
+                                  alt="School Logo"
+                              />
+                          </div>
+                          <input type="text" className="w-full text-[10px] border rounded p-1 mt-1 bg-gray-50" placeholder="URL..." value={appConfig.logoUrl3x4} onChange={e=>setAppConfig({...appConfig, logoUrl3x4: e.target.value})}/>
+                      </div>
+
                       <div className="space-y-1"><label className="text-[10px] font-bold text-gray-500">Logo 4:3</label><div className="aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border"><img src={appConfig.logoUrl4x3} className="w-full h-full object-cover"/></div><input type="text" className="w-full text-[10px] border rounded p-1" placeholder="URL..." value={appConfig.logoUrl4x3} onChange={e=>setAppConfig({...appConfig, logoUrl4x3: e.target.value})}/></div>
                   </div>
               </div>

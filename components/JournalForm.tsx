@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Plus, XCircle, Send, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, XCircle, Send, Check, ShieldAlert, ListChecks } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { MOCK_STUDENTS_FALLBACK } from '../constants';
 import { Student } from '../types';
@@ -16,8 +16,12 @@ const JournalForm: React.FC<JournalFormProps> = ({ user, onBack }) => {
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   
   const [pembelajaran, setPembelajaran] = useState([{ mapel: '', jam: [] as string[], materi: '' }]);
+  
+  // Step 3 Discipline States
+  const [disciplineNotes, setDisciplineNotes] = useState<string[]>([]);
+  const [otherNote, setOtherNote] = useState('');
+
   const [kebersihan, setKebersihan] = useState('');
-  const [validasi, setValidasi] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -45,20 +49,30 @@ const JournalForm: React.FC<JournalFormProps> = ({ user, onBack }) => {
       setStep(prev => Math.max(prev - 1, 1));
   };
 
+  const toggleDiscipline = (note: string) => {
+      setDisciplineNotes(prev => 
+          prev.includes(note) ? prev.filter(n => n !== note) : [...prev, note]
+      );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!kebersihan || !validasi) return alert('Lengkapi validasi');
+      if (!kebersihan) return alert('Pilih status kebersihan');
       
       setLoading(true);
       try {
+          // Combine notes
+          const finalNotes = [...disciplineNotes];
+          if (otherNote) finalNotes.push(otherNote);
+
           // Insert Journal
           const { data: journal, error } = await supabase.from('journals').insert({
               teacher_id: user.id,
               class_name: selectedClass,
               material: JSON.stringify(pembelajaran),
               cleanliness_status: kebersihan,
-              validation_status: validasi,
-              notes: '' 
+              validation_status: 'Verified', // Auto verified by resume check
+              notes: finalNotes.join(', ')
           }).select().single();
 
           if (error) throw error;
@@ -204,6 +218,7 @@ const JournalForm: React.FC<JournalFormProps> = ({ user, onBack }) => {
                                     <option value="IPA">IPA</option>
                                     <option value="Bahasa Indonesia">Bahasa Indonesia</option>
                                     <option value="PPKn">PPKn</option>
+                                    <option value="Tematik">Tematik</option>
                                 </select>
                             </div>
                             <div className="mb-3">
@@ -247,40 +262,90 @@ const JournalForm: React.FC<JournalFormProps> = ({ user, onBack }) => {
              )}
 
              {step === 3 && (
-                 <div className="animate-fade-in text-center py-10">
-                    <h3 className="font-bold text-lg border-b pb-3 mb-4 text-[#23272A]">3. Catatan (Opsional)</h3>
-                    <p className="text-gray-500">Fitur catatan kedisiplinan siswa akan ditambahkan di update berikutnya.</p>
+                 <div className="animate-fade-in space-y-6">
+                    <h3 className="font-bold text-lg border-b pb-3 mb-4 text-[#23272A] flex items-center gap-2">
+                        <ShieldAlert className="w-5 h-5 text-red-500"/> 3. Catatan Kedisiplinan
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4">Centang jika ada kejadian khusus di kelas hari ini.</p>
+                    
+                    <div className="space-y-3">
+                        {['Berbicara saat diterangkan', 'Mengganggu teman', 'Tidur di kelas'].sort().map((note, idx) => (
+                            <label key={idx} className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all ${disciplineNotes.includes(note) ? 'bg-red-50 border-red-500' : 'bg-white border-gray-200 hover:border-red-200'}`}>
+                                <input 
+                                    type="checkbox" 
+                                    className="w-5 h-5 accent-red-600 rounded"
+                                    checked={disciplineNotes.includes(note)}
+                                    onChange={() => toggleDiscipline(note)}
+                                />
+                                <span className={`ml-3 font-medium ${disciplineNotes.includes(note) ? 'text-red-700' : 'text-gray-700'}`}>{note}</span>
+                            </label>
+                        ))}
+                    </div>
+
+                    <div className="mt-4">
+                        <label className="block text-sm font-medium mb-2 text-gray-700">Catatan Lainnya (Opsional)</label>
+                        <textarea 
+                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                            rows={3}
+                            placeholder="Tulis kejadian lain..."
+                            value={otherNote}
+                            onChange={(e) => setOtherNote(e.target.value)}
+                        />
+                    </div>
                  </div>
              )}
 
              {step === 4 && (
-                 <div className="animate-fade-in space-y-4">
-                    <h3 className="font-bold text-lg border-b pb-3 mb-4 text-[#23272A]">4. Validasi</h3>
+                 <div className="animate-fade-in space-y-6">
+                    <h3 className="font-bold text-lg border-b pb-3 mb-4 text-[#23272A] flex items-center gap-2">
+                        <ListChecks className="w-5 h-5 text-green-600"/> 4. Validasi & Resume
+                    </h3>
                     
-                    <div>
-                        <label className="block text-sm font-medium mb-2 text-gray-700">Kebersihan Kelas</label>
-                        <div className="space-y-2">
-                            <label className="flex items-center p-3 rounded-lg bg-gray-50 border border-transparent hover:border-[#FEE75C] cursor-pointer">
-                                <input type="radio" name="keb" value="mengarahkan_piket" onChange={(e)=>setKebersihan(e.target.value)} className="w-4 h-4 accent-[#5865F2]"/>
-                                <span className="ml-3 text-gray-700">Mengarahkan Piket</span>
-                            </label>
-                            <label className="flex items-center p-3 rounded-lg bg-gray-50 border border-transparent hover:border-[#FEE75C] cursor-pointer">
-                                <input type="radio" name="keb" value="sudah_bersih" onChange={(e)=>setKebersihan(e.target.value)} className="w-4 h-4 accent-[#5865F2]"/>
-                                <span className="ml-3 text-gray-700">Kelas Sudah Bersih</span>
-                            </label>
+                    {/* Resume Card */}
+                    <div className="bg-gray-50 rounded-xl p-5 border border-gray-200 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                 <label className="text-xs font-bold text-gray-400 uppercase">Kelas</label>
+                                 <div className="font-bold text-gray-800">{selectedClass}</div>
+                             </div>
+                             <div>
+                                 <label className="text-xs font-bold text-gray-400 uppercase">Total Siswa Hadir</label>
+                                 <div className="font-bold text-gray-800">{Object.values(attendance).filter(v => v === 'S' || v === 'I' || v === 'A' || v === 'D').length > 0 ? 'Terisi' : 'Belum diisi'}</div>
+                             </div>
+                        </div>
+                        
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Materi Ajar</label>
+                            {pembelajaran.map((p, i) => (
+                                <div key={i} className="text-sm border-l-4 border-[#5865F2] pl-3 py-1 mb-2 bg-white rounded-r">
+                                    <span className="font-bold text-[#5865F2]">{p.mapel}</span> (Jam {p.jam.join(',')}) : {p.materi}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Catatan Disiplin</label>
+                            {disciplineNotes.length > 0 || otherNote ? (
+                                <ul className="list-disc list-inside text-sm text-red-600">
+                                    {disciplineNotes.map(n => <li key={n}>{n}</li>)}
+                                    {otherNote && <li>Lainnya: {otherNote}</li>}
+                                </ul>
+                            ) : (
+                                <span className="text-sm text-green-600 italic">Tidak ada catatan (Kelas Kondusif)</span>
+                            )}
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium mb-2 text-gray-700">Validasi KBM</label>
+                        <label className="block text-sm font-medium mb-2 text-gray-700">Status Kebersihan Kelas</label>
                         <div className="space-y-2">
-                            <label className="flex items-center p-3 rounded-lg bg-gray-50 border border-transparent hover:border-[#FEE75C] cursor-pointer">
-                                <input type="radio" name="val" value="hadir_kbm" onChange={(e)=>setValidasi(e.target.value)} className="w-4 h-4 accent-[#5865F2]"/>
-                                <span className="ml-3 text-gray-700">KBM Tatap Muka</span>
+                            <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${kebersihan === 'mengarahkan_piket' ? 'bg-yellow-50 border-yellow-400' : 'bg-white border-gray-200'}`}>
+                                <input type="radio" name="keb" value="mengarahkan_piket" onChange={(e)=>setKebersihan(e.target.value)} className="w-4 h-4 accent-[#5865F2]"/>
+                                <span className="ml-3 text-gray-700">Guru Mengarahkan Piket</span>
                             </label>
-                            <label className="flex items-center p-3 rounded-lg bg-gray-50 border border-transparent hover:border-[#FEE75C] cursor-pointer">
-                                <input type="radio" name="val" value="izin_tugas" onChange={(e)=>setValidasi(e.target.value)} className="w-4 h-4 accent-[#5865F2]"/>
-                                <span className="ml-3 text-gray-700">KBM Tugas (Izin)</span>
+                            <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${kebersihan === 'sudah_bersih' ? 'bg-green-50 border-green-400' : 'bg-white border-gray-200'}`}>
+                                <input type="radio" name="keb" value="sudah_bersih" onChange={(e)=>setKebersihan(e.target.value)} className="w-4 h-4 accent-[#5865F2]"/>
+                                <span className="ml-3 text-gray-700">Kelas Sudah Bersih</span>
                             </label>
                         </div>
                     </div>
@@ -300,7 +365,7 @@ const JournalForm: React.FC<JournalFormProps> = ({ user, onBack }) => {
                     </button>
                  ) : (
                     <button type="submit" disabled={loading} className="px-6 py-2 bg-[#5865F2] text-white rounded-lg hover:bg-[#4752C4] flex items-center font-bold shadow-md transition-all">
-                        {loading ? 'Mengirim...' : 'Kirim Jurnal'} <Send className="w-4 h-4 ml-2" />
+                        {loading ? 'Mengirim...' : 'Konfirmasi & Kirim'} <Send className="w-4 h-4 ml-2" />
                     </button>
                  )}
              </div>

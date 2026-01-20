@@ -39,7 +39,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
 
     // Simulate Network Delay
     setTimeout(async () => {
-        // 1. Super Admin (Both spellings handled as per request)
+        // 1. Super Admin
         if ((identifier === 'superadmin' || identifier === 'supermadmin') && password === 'admin') {
             onSuccess({
             id: 'super-admin-id',
@@ -109,7 +109,6 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                 onSuccess({ ...data.user, profile, role: 'teacher' });
             }
         } catch (err: any) {
-            // If supabase fails and no mock data matched
             setError('Login gagal. Periksa Username/NIP/NISN dan Password.');
         } finally {
             setLoading(false);
@@ -118,24 +117,29 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 pb-24">
-      <div className="w-full max-w-[400px] z-10 animate-fade-in-up">
-        
-        <div className="glass-panel p-8 rounded-[32px] shadow-2xl relative overflow-hidden">
-            {/* Decorative background within card */}
-            <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none"></div>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-[#F1F5F9]">
+      
+      {/* Background Decor */}
+      <div className="absolute top-0 left-0 w-full h-1/2 bg-[#0F2167] rounded-b-[3rem] z-0"></div>
 
+      <div className="w-full max-w-[360px] z-10 flex flex-col items-center">
+        
+        {/* LOGO SECTION - STANDALONE */}
+        <div className="mb-8 relative z-20">
+            {/* Logo Image with Gold Shimmer Animation - No Background Box */}
+            <img
+                src="https://i.imghippo.com/files/kldd1383bkc.png"
+                alt="Logo Sekolah"
+                className="h-44 w-auto object-contain animate-gold-shimmer drop-shadow-2xl"
+            />
+        </div>
+
+        {/* LOGIN CARD - SEPARATE */}
+        <div className="w-full glass-panel pt-10 pb-10 px-8 rounded-[2rem] shadow-2xl relative overflow-hidden animate-fade-in-up border border-white">
             <div className="text-center mb-8 relative z-10">
-                <div className="w-24 h-24 mx-auto mb-4 relative">
-                    <div className="absolute inset-0 bg-primary rounded-full blur-lg opacity-40 animate-pulse"></div>
-                    <img
-                        src="https://picsum.photos/id/20/200/200"
-                        alt="Logo"
-                        className="relative w-full h-full rounded-full border-4 border-white shadow-lg object-cover"
-                    />
-                </div>
-                <h1 className="text-2xl font-black text-dark tracking-tight">BISMA</h1>
-                <p className="text-gray-500 text-sm font-medium">Monitoring Kegiatan Belajar Mengajar</p>
+                <h1 className="text-4xl font-black text-primary tracking-tight mb-2">BISMA</h1>
+                <div className="h-1.5 w-12 bg-warning mx-auto rounded-full mb-3"></div>
+                <p className="text-gray-500 font-bold text-[10px] uppercase tracking-[0.3em]">Sistem Monitoring KBM</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5 relative z-10">
@@ -147,7 +151,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                         <input
                             type="text"
                             placeholder="Username / NIP / NISN"
-                            className="w-full pl-11 pr-4 py-4 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-dark font-medium placeholder-gray-400"
+                            className="w-full pl-11 pr-4 py-4 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-dark font-bold text-sm placeholder-gray-400"
                             value={identifier}
                             onChange={(e) => setIdentifier(e.target.value)}
                             required
@@ -163,7 +167,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                         <input
                             type="password"
                             placeholder="Password"
-                            className="w-full pl-11 pr-4 py-4 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-dark font-medium placeholder-gray-400"
+                            className="w-full pl-11 pr-4 py-4 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-dark font-bold text-sm placeholder-gray-400"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
@@ -172,7 +176,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                 </div>
 
                 {error && (
-                    <div className="p-3 bg-danger/10 text-danger text-sm text-center rounded-xl font-medium animate-pulse">
+                    <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-xs text-center rounded-xl font-bold animate-pulse">
                         {error}
                     </div>
                 )}
@@ -180,43 +184,47 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-primary hover:bg-[#4752C4] text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 group"
+                    className="w-full bg-[#0F2167] hover:bg-[#1e3a8a] text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/30 transition-all active:scale-95 flex items-center justify-center gap-2 group transform hover:-translate-y-0.5 mt-2"
                 >
                     {loading ? (
                         <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                     ) : (
                         <>
-                            <ShieldCheck className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                            Masuk Aplikasi
+                            <ShieldCheck className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" />
+                            MASUK APLIKASI
                         </>
                     )}
                 </button>
             </form>
 
-            <div className="mt-8 text-center space-y-2">
-                <p className="text-xs text-gray-400">© 2026 SDN Baujeng 1 • Powered by BISMA</p>
-                <p className="text-[10px] text-gray-300">Gunakan akun tes: 12345 (Guru) / 2345 (Siswa)</p>
+            <div className="mt-8 text-center space-y-3 relative z-10">
+                <p className="text-[10px] text-gray-400 font-medium">© 2026 SDN Baujeng 1</p>
+                <div className="inline-block px-4 py-1.5 bg-gray-50 rounded-full border border-gray-100">
+                      <p className="text-[10px] text-gray-400 font-medium">Akun Tes: <span className="font-bold text-primary">12345</span> • <span className="font-bold text-primary">2345</span></p>
+                </div>
             </div>
         </div>
       </div>
 
       {/* --- FLOATING FOOTER NAV --- */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-6 py-3 z-50">
-          <div className="flex justify-around items-center">
-              <button onClick={() => window.location.reload()} className="flex flex-col items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors">
-                  <Home className="w-6 h-6" />
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-6 py-3 z-50">
+          <div className="flex justify-around items-center max-w-md mx-auto">
+              <button onClick={() => window.location.reload()} className="flex flex-col items-center gap-1 text-gray-400 hover:text-primary transition-colors group">
+                  <Home className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
                   <span className="text-[10px] font-medium">Beranda</span>
               </button>
-              <button onClick={() => window.open('https://www.sdnbaujeng1.sch.id/', '_blank')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors">
-                  <Search className="w-6 h-6" />
+              <button onClick={() => window.open('https://www.sdnbaujeng1.sch.id/', '_blank')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-primary transition-colors group">
+                  <Search className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
                   <span className="text-[10px] font-medium">Cari</span>
               </button>
-              <button className="flex flex-col items-center gap-1 text-blue-600">
-                  <User className="w-6 h-6" />
+              <button className="flex flex-col items-center gap-1 text-primary">
+                  <div className="bg-blue-50 p-1.5 rounded-full -mt-1 mb-0.5 text-primary">
+                    <User className="w-5 h-5" />
+                  </div>
                   <span className="text-[10px] font-bold">Login</span>
               </button>
-              <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors">
-                  <Info className="w-6 h-6" />
+              <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-primary transition-colors group">
+                  <Info className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
                   <span className="text-[10px] font-medium">Info</span>
               </button>
           </div>

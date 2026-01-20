@@ -48,7 +48,7 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
       case 'green': return { bg: 'bg-green-50', border: 'border-green-100', iconBg: 'bg-green-100', iconText: 'text-green-600', text: 'text-green-600' };
       case 'pink': return { bg: 'bg-pink-50', border: 'border-pink-100', iconBg: 'bg-pink-100', iconText: 'text-pink-600', text: 'text-pink-600' };
       case 'purple': return { bg: 'bg-purple-50', border: 'border-purple-100', iconBg: 'bg-purple-100', iconText: 'text-purple-600', text: 'text-purple-600' };
-      default: return { bg: 'bg-yellow-50', border: 'border-yellow-100', iconBg: 'bg-yellow-100', iconText: 'text-yellow-600', text: 'text-yellow-600' };
+      default: return { bg: 'bg-amber-50', border: 'border-amber-100', iconBg: 'bg-amber-100', iconText: 'text-amber-700', text: 'text-amber-700' };
     }
   };
 
@@ -58,7 +58,7 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
   if (searchView) {
       return (
           <div className="min-h-screen flex flex-col bg-white">
-              <header className="bg-blue-600 p-4 text-white flex items-center gap-4 shadow-md sticky top-0 z-50">
+              <header className="bg-[#0F2167] p-4 text-white flex items-center gap-4 shadow-md sticky top-0 z-50">
                   <button onClick={() => setSearchView(false)} className="p-2 hover:bg-white/20 rounded-full">
                       <ArrowLeft className="w-6 h-6" />
                   </button>
@@ -77,29 +77,33 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] font-sans pb-24">
+    <div className="min-h-screen bg-[#F1F5F9] font-sans pb-24 relative overflow-hidden">
       
+      {/* Background Shapes from index.html will show through here */}
+
       {/* --- STICKY HEADER --- */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-blue-600 to-yellow-400 shadow-lg px-4 py-3 md:px-8 transition-all duration-300 rounded-b-3xl md:rounded-b-none">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-[#0F2167] to-[#1e3a8a] shadow-lg px-4 py-3 md:px-8 transition-all duration-300 rounded-b-3xl md:rounded-b-none border-b border-blue-900/50">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
             <div className="flex items-center gap-3">
-                <div className="relative group cursor-pointer">
+                <div className="relative cursor-pointer">
+                    {/* Frame removed completely, just image and glow/shadow */}
+                    <div className="absolute inset-0 bg-yellow-400/20 rounded-full blur-lg"></div>
                     <img
-                        src="https://picsum.photos/id/20/200/200"
+                        src="https://i.imghippo.com/files/kldd1383bkc.png"
                         alt="Logo"
-                        className="relative h-10 w-10 md:h-12 md:w-12 rounded-full border-2 border-white object-cover shadow-sm"
+                        className="relative h-12 w-auto object-contain drop-shadow-md hover:scale-105 transition-transform"
                     />
                 </div>
                 <div>
                     <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter drop-shadow-sm">BISMA</h1>
-                    <p className="text-blue-50 font-medium tracking-wide text-[10px] md:text-xs">SDN BAUJENG 1</p>
+                    <p className="text-amber-400 font-bold tracking-wide text-[10px] md:text-xs">SDN BAUJENG 1</p>
                 </div>
             </div>
             
             {/* Time Widget (Desktop) */}
             <div className="hidden md:block text-right text-white">
                  <div className="font-bold text-lg leading-none">{time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':')}</div>
-                 <div className="text-xs opacity-90">{time.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })}</div>
+                 <div className="text-xs opacity-90 text-blue-200">{time.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })}</div>
             </div>
         </div>
       </header>
@@ -108,14 +112,14 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
       <div className="h-24 md:h-20"></div>
 
       {/* Main Content Grid */}
-      <main className="p-4 md:p-8 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in-up">
+      <main className="p-4 md:p-8 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in-up relative z-10">
         
         {/* Left Column */}
         <div className="lg:col-span-8 space-y-6">
             
             {/* Interactive Welcome Card (Simplified for SD) */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-blue-100 relative overflow-hidden group">
-                 <div className="absolute right-0 top-0 h-full w-2 bg-gradient-to-b from-blue-500 to-yellow-400"></div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-blue-100 relative overflow-hidden group">
+                 <div className="absolute right-0 top-0 h-full w-2 bg-gradient-to-b from-[#0F2167] to-[#D97706]"></div>
                  
                  <h2 className="text-2xl md:text-3xl font-black text-gray-800 mb-2">
                     Selamat Datang! 👋
@@ -126,9 +130,9 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
             </div>
 
             {/* Statistik Siswa (Friendly Cards) */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-gray-100">
                  <div className="flex items-center gap-2 mb-4">
-                     <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
+                     <div className="w-8 h-8 bg-blue-100 text-[#0F2167] rounded-full flex items-center justify-center">
                         <Users className="w-5 h-5" />
                      </div>
                      <h3 className="font-bold text-gray-800 text-lg">Info Kelas</h3>
@@ -136,8 +140,8 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
                  
                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                     {[1, 2, 3, 4, 5, 6].map((cls) => (
-                        <div key={cls} className="bg-white border-2 border-blue-50 rounded-2xl p-2 text-center hover:bg-blue-50 hover:border-blue-200 transition-all cursor-default">
-                            <div className="text-xl font-black text-blue-600">{stats.classStats[cls.toString()] || 0}</div>
+                        <div key={cls} className="bg-white border-2 border-slate-100 rounded-2xl p-2 text-center hover:bg-blue-50 hover:border-blue-200 transition-all cursor-default shadow-sm group">
+                            <div className="text-xl font-black text-[#0F2167] group-hover:text-blue-600 transition-colors">{stats.classStats[cls.toString()] || 0}</div>
                             <div className="text-[10px] text-gray-400 font-bold uppercase mt-1">Kelas {cls}</div>
                         </div>
                     ))}
@@ -150,7 +154,7 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
         <div className="lg:col-span-4 space-y-6">
             
             {/* Pengumuman Hari Ini (Redesigned as requested) */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 mb-6">
                     <div className={`p-2 rounded-xl ${theme.iconBg} ${theme.iconText}`}><Megaphone className="w-6 h-6"/></div>
                     <h3 className="font-black text-gray-800 text-lg leading-tight">{config.announcementTitle}</h3>
@@ -180,13 +184,13 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
             </div>
 
             {/* Login CTA (Desktop Only) */}
-            <div className="hidden lg:block bg-[#23272A] rounded-3xl p-6 text-center text-white relative overflow-hidden">
+            <div className="hidden lg:block bg-[#0F2167] rounded-3xl p-6 text-center text-white relative overflow-hidden shadow-xl">
                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
                  <h3 className="font-bold text-lg mb-2 relative z-10">Area Guru & Siswa</h3>
-                 <p className="text-xs text-gray-400 mb-6 relative z-10">Silahkan login untuk akses jurnal & tugas.</p>
+                 <p className="text-xs text-blue-200 mb-6 relative z-10">Silahkan login untuk akses jurnal & tugas.</p>
                  <button
                         onClick={onLoginClick}
-                        className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-lg shadow-blue-900/50 relative z-10 flex items-center justify-center gap-2"
+                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-amber-700 transition-colors shadow-lg shadow-amber-900/50 relative z-10 flex items-center justify-center gap-2"
                     >
                         <LogIn className="w-4 h-4"/> Masuk Aplikasi
                 </button>
@@ -197,21 +201,21 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
       </main>
 
       {/* --- FIXED BOTTOM NAVIGATION (Mobile) --- */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-6 py-3 z-50 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-6 py-3 z-50 md:hidden">
           <div className="flex justify-around items-center">
-              <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex flex-col items-center gap-1 text-blue-600">
+              <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex flex-col items-center gap-1 text-[#0F2167]">
                   <Home className="w-6 h-6" />
                   <span className="text-[10px] font-bold">Beranda</span>
               </button>
-              <button onClick={() => setSearchView(true)} className="flex flex-col items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors">
+              <button onClick={() => setSearchView(true)} className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#0F2167] transition-colors">
                   <Search className="w-6 h-6" />
                   <span className="text-[10px] font-medium">Cari</span>
               </button>
-              <button onClick={onLoginClick} className="flex flex-col items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors">
+              <button onClick={onLoginClick} className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#0F2167] transition-colors">
                   <User className="w-6 h-6" />
                   <span className="text-[10px] font-medium">Login</span>
               </button>
-              <button onClick={() => setIsInfoOpen(true)} className="flex flex-col items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors">
+              <button onClick={() => setIsInfoOpen(true)} className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#0F2167] transition-colors">
                   <Info className="w-6 h-6" />
                   <span className="text-[10px] font-medium">Info</span>
               </button>
@@ -225,8 +229,8 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
                   <button onClick={() => setIsInfoOpen(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"><X className="w-5 h-5 text-gray-600"/></button>
                   
                   <div className="p-6">
-                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-                          <Info className="w-8 h-8 text-blue-600"/>
+                      <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 mx-auto">
+                          <Info className="w-8 h-8 text-[#0F2167]"/>
                       </div>
                       <h3 className="text-xl font-black text-center text-gray-800 mb-2">Panduan Informasi</h3>
                       <p className="text-center text-gray-500 text-xs mb-6">
@@ -241,7 +245,7 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
                           
                           <button 
                               onClick={handleWhatsAppClick}
-                              className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all active:scale-95"
+                              className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all active:scale-95"
                           >
                               <MessageCircle className="w-5 h-5" /> Chat WhatsApp Admin
                           </button>
