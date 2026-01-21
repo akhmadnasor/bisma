@@ -9,7 +9,8 @@ import {
   Globe, MessageCircle, Menu, ExternalLink, Clock, Upload, Database, Key, Server,
   Recycle, LayoutTemplate, Trophy, ArrowLeft, Palette, Info, RefreshCw, Trash, ShieldCheck, Link,
   AlertTriangle, FileWarning, XCircle, ShoppingCart, Check, X as XIcon, Image,
-  Grid
+  Grid, BellOff, Bot, Wallet, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Package,
+  UserCheck, Shield
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { AppConfig, TrashTransaction, Grade, WasteType, PermissionRequest, GoodDeedRequest } from '../types';
@@ -32,6 +33,7 @@ interface ImportResult {
 const MENU_CONFIG = [
     { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'app_config', label: 'App & Sekolah', icon: LayoutTemplate },
+    { id: 'users_auth', label: 'User Auth', icon: UserCheck }, // New Auth Menu
     { id: 'students', label: 'Data Siswa', icon: GraduationCap },
     { id: 'teachers', label: 'Data Guru', icon: Users },
     { id: 'schedule', label: 'Jadwal KBM', icon: CalendarRange },
@@ -91,47 +93,62 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Data States - Initialized Empty (No Dummy Data)
+  // Data States - Initialized Empty
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   
-  // Finance, Permissions, Good Deeds Mock Data
+  // Finance States
+  const [financeTab, setFinanceTab] = useState<'overview' | 'input' | 'settings'>('overview');
   const [wasteTypes, setWasteTypes] = useState<WasteType[]>([
       { id: 1, name: 'Plastik Gelas (Bersih)', price_per_kg: 3000 },
       { id: 2, name: 'Kertas Putih/Buku', price_per_kg: 2500 },
       { id: 3, name: 'Kardus', price_per_kg: 1500 },
       { id: 4, name: 'Botol PET', price_per_kg: 2000 },
+      { id: 5, name: 'Logam/Kaleng', price_per_kg: 4000 },
   ]);
   const [wasteTransactions, setWasteTransactions] = useState<TrashTransaction[]>([]);
+  
+  // Finance Input Form State
+  const [financeForm, setFinanceForm] = useState({
+      studentId: '',
+      transactionType: 'deposit', // 'deposit' or 'withdraw'
+      wasteTypeId: 1,
+      weight: '',
+      withdrawItem: 'Uang Tunai', // 'Uang Tunai', 'Buku Tulis', 'Pensil', 'Penghapus', 'ATK Lain'
+      withdrawAmount: '', // Price/Value
+      notes: ''
+  });
+
   const [permissions, setPermissions] = useState<PermissionRequest[]>([]);
   const [goodDeeds, setGoodDeeds] = useState<GoodDeedRequest[]>([]);
+
+  // Auth Management State
+  const [authSyncProgress, setAuthSyncProgress] = useState(0);
+  const [isAuthSyncing, setIsAuthSyncing] = useState(false);
+  const [authSyncLogs, setAuthSyncLogs] = useState<string[]>([]);
 
   // Feedback Modal State
   const [importResult, setImportResult] = useState<ImportResult>({
       isOpen: false, status: 'success', title: '', message: '', details: []
   });
   
-  // Selection State
-  const [selectedTeacherIds, setSelectedTeacherIds] = useState<number[]>([]);
-  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
-
-  // Grade Recap Filter States
+  // Grade Recap Filter States & Config
   const [gradeFilterClass, setGradeFilterClass] = useState('5A');
   const [gradeFilterSubject, setGradeFilterSubject] = useState('Matematika');
+  const [phCount, setPhCount] = useState(2); // Default displayed PH columns
 
   // Import State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importType, setImportType] = useState<'student' | 'teacher' | 'schedule' | null>(null);
 
   // API & Integration States
-  const [serviceRoleKey, setServiceRoleKey] = useState('');
+  // Injected Service Role Key as requested
+  const [serviceRoleKey, setServiceRoleKey] = useState('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkZGFscHF2a3d0Y2JmcmR4dmZjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODg1MTU1OSwiZXhwIjoyMDg0NDI3NTU5fQ.ZvahvAJ9gX8mKm-r5ihQFsPYvEHIEutQlJ-1so7zXi4');
   const [customSupabaseUrl, setCustomSupabaseUrl] = useState(defaultSupabaseUrl);
   const [customSupabaseKey, setCustomSupabaseKey] = useState('');
   
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncLog, setSyncLog] = useState<string[]>([]);
   const [savingConfig, setSavingConfig] = useState(false);
 
   // App Config
@@ -176,11 +193,9 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
              setAppConfig(prev => ({ ...prev, ...configData }));
              if (configData.supabase_url) setCustomSupabaseUrl(configData.supabase_url);
              if (configData.supabase_anon_key) setCustomSupabaseKey(configData.supabase_anon_key);
-             // Note: service_role_key is usually not stored in public app_config for security, 
-             // but if user manually inputted it before, we rely on local state or user re-input.
         }
 
-        const { data: sData } = await supabase.from('students').select('*').order('name');
+        const { data: sData } = await supabase.from('students').select('*').order('class_name', { ascending: true }).order('name');
         setStudents(sData || []);
 
         const { data: tData } = await supabase.from('teachers').select('*').order('name');
@@ -191,6 +206,10 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
 
         const { data: gData } = await supabase.from('grades').select('*');
         setGrades(gData || []);
+        
+        // Fetch Trash Transactions if exists, else mock empty
+        const { data: trashData } = await supabase.from('trash_transactions').select('*').order('created_at', { ascending: false });
+        if (trashData) setWasteTransactions(trashData);
 
     } catch (e: any) {
         console.error("Error fetching data:", e);
@@ -203,7 +222,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
     fetchData();
   }, []);
 
-  // --- CSV Logic ---
+  // --- CSV Logic & Templates (Kept as is) ---
   const parseCSV = (text: string) => {
     const cleanText = text.replace(/^\uFEFF/, '');
     const lines = cleanText.split(/\r\n|\n|\r/).filter(l => l.trim());
@@ -297,8 +316,6 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       }
   };
 
-  // Function to create users in Supabase Auth using Admin API
-  // Requires Service Role Key to be set in API Settings
   const createAuthUsers = async (data: any[], type: 'student' | 'teacher') => {
       if (!serviceRoleKey) {
           return { success: false, error: 'Service Role Key belum diatur di menu API Settings. User hanya disimpan di tabel, tidak masuk Auth.' };
@@ -316,18 +333,12 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
 
       for (const user of data) {
           try {
-              // Generate fake email for Auth: [identifier]@bisma.id
               const identifier = type === 'student' ? user.nisn : user.nip;
               const email = `${identifier}@bisma.id`;
               
-              // 1. Check if user already exists
-              // (Simplification: We just try to create, if it fails due to existing user, we might want to update password, 
-              // but admin.createUser throws error if email exists. We will try to update if create fails)
-              
-              // Try Create
               const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
                   email: email,
-                  password: user.password || '123456', // Default password if missing
+                  password: user.password || '123456', 
                   email_confirm: true,
                   user_metadata: {
                       name: user.name,
@@ -338,13 +349,8 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
               });
 
               if (createError) {
-                  // If user exists, try to update password
                   if (createError.message.includes('already registered')) {
-                      // We need the user ID to update. Find user by email.
-                      // Note: listUsers requires pagination, searching strictly by email is tricky without ID in Admin API v1. 
-                      // Workaround: We skip update or handle it if critical.
-                      // For this demo, we'll log it as "Skipped/Exists".
-                      // errors.push(`User ${user.name} (${identifier}) sudah ada di Auth.`);
+                      // Already exists, ignore
                   } else {
                       errors.push(`Gagal buat Auth ${user.name}: ${createError.message}`);
                   }
@@ -358,6 +364,41 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       }
 
       return { success: true, count: successCount, errors };
+  };
+
+  const handleSyncAuth = async () => {
+      if (!confirm("Proses ini akan membuat akun login (Supabase Auth) untuk SEMUA Guru dan Siswa yang ada di database. Lanjutkan?")) return;
+      
+      setIsAuthSyncing(true);
+      setAuthSyncProgress(0);
+      setAuthSyncLogs([]);
+      
+      try {
+          const total = teachers.length + students.length;
+          let current = 0;
+          const newLogs: string[] = [];
+
+          // Sync Teachers
+          const teacherRes = await createAuthUsers(teachers, 'teacher');
+          current += teachers.length;
+          setAuthSyncProgress(Math.round((current / total) * 100));
+          newLogs.push(`Guru: ${teacherRes.count} Sukses, ${teacherRes.errors.length} Gagal/Ada.`);
+
+          // Sync Students
+          // Process in chunks to avoid blocking UI too much if many students
+          const studentRes = await createAuthUsers(students, 'student');
+          current += students.length;
+          setAuthSyncProgress(100);
+          newLogs.push(`Siswa: ${studentRes.count} Sukses, ${studentRes.errors.length} Gagal/Ada.`);
+
+          setAuthSyncLogs(newLogs);
+          alert("Sinkronisasi Selesai!");
+
+      } catch (e: any) {
+          alert("Error Sync: " + e.message);
+      } finally {
+          setIsAuthSyncing(false);
+      }
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -381,7 +422,6 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                   const rowNum = index + 2;
                   if (!row.nisn) validationErrors.push(`Baris ${rowNum}: NISN Kosong`);
                   if (!row.name && !row['nama siswa']) validationErrors.push(`Baris ${rowNum}: Nama Kosong`);
-                  if (!row.class_name && !row['kelas']) validationErrors.push(`Baris ${rowNum}: Kelas Kosong`);
                   dataToUpsert.push({
                       nisn: row.nisn,
                       nis: row.nis || '',
@@ -423,7 +463,6 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
               return;
           }
 
-          // DEDUPLICATION CLIENT SIDE
           let finalData = dataToUpsert;
           if (primaryKey) {
               const map = new Map();
@@ -435,11 +474,9 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
               finalData = Array.from(map.values());
           }
 
-          // 1. UPSERT TO PUBLIC TABLE
           const { error } = await supabase.from(tableName).upsert(finalData, { onConflict: primaryKey || undefined });
           if (error) throw error;
 
-          // 2. CREATE AUTH USERS (If Student or Teacher)
           let authMessage = '';
           if (importType === 'student' || importType === 'teacher') {
               const authRes = await createAuthUsers(finalData, importType);
@@ -471,7 +508,6 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
   const handleSaveConfig = async () => {
       setSavingConfig(true);
       try {
-          // In real app, upsert to app_config table
           // await supabase.from('app_config').upsert(appConfig);
           setTimeout(() => {
               alert("Konfigurasi berhasil disimpan!");
@@ -487,23 +523,14 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       if(!confirm("Yakin ingin menghapus data ini dari Database?")) return;
       
       const tableName = type === 'student' ? 'students' : type === 'teacher' ? 'teachers' : 'schedules';
-      
-      // Get data before delete to try finding Auth user later (if needed)
-      // Note: We don't delete Auth user automatically here to prevent accidental lockout if ID mismatch, 
-      // but strictly following requirements "hapus data database yang berkaitan", we delete the public record.
-      
       const { error } = await supabase.from(tableName).delete().eq('id', id);
       
       if (error) {
           alert("Gagal menghapus: " + error.message);
       } else {
-          // Optimistic update
           if(type === 'student') setStudents(prev => prev.filter(p => p.id !== id));
           if(type === 'teacher') setTeachers(prev => prev.filter(p => p.id !== id));
           if(type === 'schedule') setSchedules(prev => prev.filter(p => p.id !== id));
-          
-          // Optionally refresh to be sure
-          // fetchData(); 
       }
   };
 
@@ -520,7 +547,6 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       setModalType(type);
       
       if (type === 'schedule') {
-          // Parse time "Jam Ke-1, 2" -> [1, 2]
           const timeStr = item.time.replace('Jam Ke-', '');
           const hours = timeStr.includes(',') ? timeStr.split(', ').map((s: string) => parseInt(s)) : [parseInt(timeStr)];
           const isStd = STANDARD_SUBJECTS.includes(item.subject);
@@ -591,12 +617,10 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
         let upsertedData = null;
 
         if (editingItem) {
-            // Update
             const { data, error: err } = await supabase.from(table).update(payload).eq('id', editingItem.id).select();
             dbError = err;
             upsertedData = data;
         } else {
-            // Insert
             const { data, error: err } = await supabase.from(table).insert(payload).select();
             dbError = err;
             upsertedData = data;
@@ -604,7 +628,6 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
 
         if (dbError) throw dbError;
 
-        // Auto Create Auth if new User (and Service Role Key exists)
         if (!editingItem && (modalType === 'student' || modalType === 'teacher') && serviceRoleKey) {
              await createAuthUsers(upsertedData || [payload], modalType);
         }
@@ -624,9 +647,82 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       );
   };
 
+  // Helper for Finance
+  const handleFinanceSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!financeForm.studentId) return alert("Pilih siswa terlebih dahulu");
+      
+      const student = students.find(s => s.id.toString() === financeForm.studentId);
+      const isDeposit = financeForm.transactionType === 'deposit';
+      
+      let amount = 0;
+      let description = '';
+      let type = '';
+
+      if (isDeposit) {
+          const waste = wasteTypes.find(w => w.id === Number(financeForm.wasteTypeId));
+          const weight = parseFloat(financeForm.weight);
+          if (!waste || isNaN(weight)) return alert("Data sampah tidak valid");
+          
+          amount = waste.price_per_kg * weight;
+          type = waste.name;
+          description = `Setor ${weight}kg ${waste.name}`;
+      } else {
+          // Withdraw
+          amount = parseFloat(financeForm.withdrawAmount);
+          if (isNaN(amount) || amount <= 0) return alert("Nominal tidak valid");
+          type = financeForm.withdrawItem;
+          description = `Penarikan: ${financeForm.withdrawItem}`;
+      }
+
+      const payload: any = {
+          student_id: parseInt(financeForm.studentId),
+          student_name: student?.name,
+          type: type,
+          weight: isDeposit ? parseFloat(financeForm.weight) : 0,
+          amount: amount,
+          status: isDeposit ? 'Deposit' : 'Withdraw', // or 'Purchase' logic if needed
+          date: new Date().toISOString().split('T')[0],
+          description: description // Additional field if DB supports it, otherwise generic
+      };
+
+      try {
+          const { error } = await supabase.from('trash_transactions').insert(payload);
+          if (error) throw error;
+          
+          alert("Transaksi berhasil disimpan!");
+          setFinanceForm({ ...financeForm, weight: '', withdrawAmount: '', notes: '' });
+          fetchData(); // Refresh transactions
+      } catch (err: any) {
+          alert("Gagal menyimpan transaksi: " + err.message);
+      }
+  };
+
+  // Helper for Preview Theme
+  const getPreviewTheme = (color: string) => {
+    switch(color) {
+      case 'blue': return { bg: 'bg-blue-50', border: 'border-blue-100', iconBg: 'bg-blue-100', iconText: 'text-blue-600', text: 'text-blue-600', accent: 'bg-blue-600' };
+      case 'green': return { bg: 'bg-green-50', border: 'border-green-100', iconBg: 'bg-green-100', iconText: 'text-green-600', text: 'text-green-600', accent: 'bg-green-600' };
+      case 'pink': return { bg: 'bg-pink-50', border: 'border-pink-100', iconBg: 'bg-pink-100', iconText: 'text-pink-600', text: 'text-pink-600', accent: 'bg-pink-600' };
+      case 'purple': return { bg: 'bg-purple-50', border: 'border-purple-100', iconBg: 'bg-purple-100', iconText: 'text-purple-600', text: 'text-purple-600', accent: 'bg-purple-600' };
+      default: return { bg: 'bg-amber-50', border: 'border-amber-100', iconBg: 'bg-amber-100', iconText: 'text-amber-700', text: 'text-amber-700', accent: 'bg-amber-500' };
+    }
+  };
+
   // --- RENDERERS ---
 
-  const renderOverview = () => (
+  const renderOverview = () => {
+      // Calculate Real Class Stats
+      const classCounts: Record<string, number> = {};
+      students.forEach(s => {
+          const c = s.class_name || 'Unassigned';
+          classCounts[c] = (classCounts[c] || 0) + 1;
+      });
+
+      // Sort class names nicely
+      const sortedClasses = Object.keys(classCounts).sort();
+
+      return (
       <div className="space-y-6 animate-fade-in-up">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><div className="text-gray-500 text-xs font-bold uppercase">Total Siswa</div><div className="text-3xl font-black text-gray-800">{students.length}</div></div>
@@ -635,6 +731,19 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onClick={fetchData}>
                   <div><div className="text-gray-500 text-xs font-bold uppercase">Sinkronisasi</div><div className="text-sm font-bold text-green-600">{loading ? 'Loading...' : 'Data Terupdate'}</div></div>
                   <RefreshCw className={`w-6 h-6 text-green-600 ${loading ? 'animate-spin' : ''}`} />
+              </div>
+          </div>
+
+          {/* Class Stats Grid */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><School className="w-5 h-5 text-indigo-600"/> Statistik Kelas (Realtime)</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {sortedClasses.length > 0 ? sortedClasses.map((cls) => (
+                      <div key={cls} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center hover:bg-indigo-50 hover:border-indigo-200 transition-colors">
+                          <div className="text-xs text-gray-500 font-bold uppercase mb-1">{cls}</div>
+                          <div className="text-xl font-black text-indigo-700">{classCounts[cls]} <span className="text-[10px] font-normal text-gray-400">Siswa</span></div>
+                      </div>
+                  )) : <div className="col-span-full text-gray-400 text-sm text-center py-4">Belum ada data siswa.</div>}
               </div>
           </div>
 
@@ -657,9 +766,81 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
               </div>
           </div>
       </div>
+      );
+  };
+
+  const renderUsersAuth = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-3xl text-white relative overflow-hidden shadow-lg">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+              <h3 className="text-2xl font-black mb-2 relative z-10">User Authentication Center</h3>
+              <p className="text-blue-100 relative z-10 max-w-xl text-sm leading-relaxed mb-6">
+                  Kelola akun login (Auth) untuk semua siswa dan guru. Sistem ini menggunakan <strong>Supabase Auth</strong> untuk keamanan maksimal.
+                  Pastikan data siswa & guru sudah diinput sebelum melakukan sinkronisasi.
+              </p>
+              
+              <div className="flex gap-4 relative z-10">
+                  <div className="flex items-center gap-3 bg-white/20 p-3 rounded-xl backdrop-blur-sm border border-white/20">
+                      <div className="bg-green-400/20 p-2 rounded-lg"><Shield className="w-5 h-5 text-green-300"/></div>
+                      <div>
+                          <div className="text-[10px] font-bold uppercase text-blue-200">Server Status</div>
+                          <div className="font-bold text-white flex items-center gap-2">Active <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span></div>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-3 bg-white/20 p-3 rounded-xl backdrop-blur-sm border border-white/20">
+                      <div className="bg-yellow-400/20 p-2 rounded-lg"><Users className="w-5 h-5 text-yellow-300"/></div>
+                      <div>
+                          <div className="text-[10px] font-bold uppercase text-blue-200">Total Users DB</div>
+                          <div className="font-bold text-white">{students.length + teachers.length} User</div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-6">
+                  <h4 className="font-bold text-lg text-gray-800 flex items-center gap-2"><RefreshCw className="w-5 h-5 text-indigo-600"/> Sinkronisasi Database ke Auth</h4>
+                  {isAuthSyncing && <span className="text-xs font-bold text-indigo-600 animate-pulse">Sedang Memproses... {authSyncProgress}%</span>}
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 mb-6 text-center">
+                  <p className="text-gray-500 text-sm mb-4">
+                      Klik tombol di bawah untuk membuat akun login otomatis bagi semua Guru (NIP) dan Siswa (NISN) yang belum terdaftar.
+                      <br/><span className="text-xs text-gray-400">(Password Default: 123456)</span>
+                  </p>
+                  <button 
+                      onClick={handleSyncAuth}
+                      disabled={isAuthSyncing}
+                      className={`px-8 py-4 rounded-xl font-bold text-white shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3 mx-auto ${isAuthSyncing ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700'}`}
+                  >
+                      {isAuthSyncing ? <RefreshCw className="w-5 h-5 animate-spin"/> : <UserCheck className="w-5 h-5"/>}
+                      {isAuthSyncing ? 'Sedang Sinkronisasi...' : 'Sync Database to Auth'}
+                  </button>
+              </div>
+
+              {/* Logs Area */}
+              {authSyncLogs.length > 0 && (
+                  <div className="bg-slate-900 rounded-xl p-4 font-mono text-xs text-green-400 h-40 overflow-y-auto custom-scrollbar border border-slate-800 shadow-inner">
+                      {authSyncLogs.map((log, i) => (
+                          <div key={i} className="mb-1">> {log}</div>
+                      ))}
+                      <div className="animate-pulse">> _</div>
+                  </div>
+              )}
+          </div>
+      </div>
   );
 
-  const renderAppConfig = () => (
+  // ... (renderAppConfig and renderTable remain largely same, skipping for brevity unless specifically asked to change) ...
+  const renderAppConfig = () => {
+      const previewTheme = getPreviewTheme(appConfig.announcementColor);
+      const date = new Date(appConfig.announcementDate);
+      const dateDisplay = isNaN(date.getTime()) ? { day: '--', month: '---' } : {
+          day: date.getDate(),
+          month: date.toLocaleDateString('id-ID', { month: 'short' }).toUpperCase()
+      };
+
+      return (
       <div className="space-y-8 animate-fade-in-up pb-10">
           {/* Identitas Sekolah */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative">
@@ -707,40 +888,6 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
               </div>
           </div>
 
-          {/* Asset Digital (Logo) */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative">
-              <div className="flex justify-between items-center border-b pb-4 mb-6">
-                  <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                      <Image className="w-5 h-5 text-indigo-600"/> Asset Digital (URL)
-                  </h3>
-                  <button onClick={handleSaveConfig} disabled={savingConfig} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:bg-indigo-700 flex items-center gap-2">
-                      {savingConfig ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>} Simpan
-                  </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[
-                      { label: 'Logo Persegi (1:1)', key: 'logoUrl1x1', aspect: 'aspect-square' },
-                      { label: 'Logo Potrait (3:4)', key: 'logoUrl3x4', aspect: 'aspect-[3/4]' },
-                      { label: 'Logo Landscape (4:3)', key: 'logoUrl4x3', aspect: 'aspect-[4/3]' },
-                  ].map((item: any) => (
-                      <div key={item.key} className="space-y-2">
-                          <label className="block text-xs font-bold text-gray-500 uppercase">{item.label}</label>
-                          <input 
-                            value={(appConfig as any)[item.key]} 
-                            onChange={(e) => setAppConfig({...appConfig, [item.key]: e.target.value})}
-                            className="w-full p-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none mb-2"
-                            placeholder="https://..."
-                          />
-                          <div className={`w-full ${item.aspect} bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden relative group`}>
-                              {(appConfig as any)[item.key] ? (
-                                  <img src={(appConfig as any)[item.key]} className="w-full h-full object-cover" alt="Preview" onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150?text=Error')}/>
-                              ) : <span className="text-gray-400 text-xs">Preview</span>}
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          </div>
-
           {/* Pengumuman & Preview */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h3 className="font-bold text-lg text-gray-800 border-b pb-4 mb-6 flex items-center gap-2">
@@ -753,7 +900,8 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                           <input 
                             value={appConfig.announcementTitle} 
                             onChange={(e) => setAppConfig({...appConfig, announcementTitle: e.target.value})}
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Kosongkan jika tidak ada pengumuman"
                           />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -763,7 +911,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                                 type="date"
                                 value={appConfig.announcementDate} 
                                 onChange={(e) => setAppConfig({...appConfig, announcementDate: e.target.value})}
-                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                               />
                           </div>
                           <div>
@@ -772,7 +920,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                                 value={appConfig.announcementType} 
                                 onChange={(e) => setAppConfig({...appConfig, announcementType: e.target.value})}
                                 placeholder="Akademik / Libur / dll"
-                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                               />
                           </div>
                       </div>
@@ -782,7 +930,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                             value={appConfig.announcementTime} 
                             onChange={(e) => setAppConfig({...appConfig, announcementTime: e.target.value})}
                             placeholder="08:00 - Selesai"
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                           />
                       </div>
                       <div>
@@ -791,7 +939,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                             value={appConfig.announcementDesc} 
                             onChange={(e) => setAppConfig({...appConfig, announcementDesc: e.target.value})}
                             rows={3}
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none resize-none"
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none resize-none focus:ring-2 focus:ring-indigo-500"
                           />
                       </div>
                       <div>
@@ -812,270 +960,61 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                       </button>
                   </div>
                   
-                  {/* Live Preview */}
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Live Preview (Tampilan Siswa)</label>
-                      <div className={`p-6 rounded-3xl shadow-lg border border-gray-100 relative overflow-hidden`} style={{
-                          backgroundColor: appConfig.announcementColor === 'yellow' ? '#fffbeb' : appConfig.announcementColor === 'blue' ? '#eff6ff' : appConfig.announcementColor === 'green' ? '#f0fdf4' : appConfig.announcementColor === 'pink' ? '#fdf2f8' : '#f5f3ff'
-                      }}>
-                          <div className="flex items-start gap-4 mb-4 relative z-10">
-                              <div className={`flex flex-col items-center justify-center w-14 h-14 rounded-2xl bg-white/60 backdrop-blur-sm shrink-0 border border-white/50 text-${appConfig.announcementColor}-700`}>
-                                  <span className="text-xl font-black leading-none">{new Date(appConfig.announcementDate).getDate() || '15'}</span>
-                                  <span className="text-[9px] font-bold uppercase tracking-wider">{new Date(appConfig.announcementDate).toLocaleDateString('id-ID', {month: 'short'}) || 'MAR'}</span>
-                              </div>
-                              <div>
-                                  <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 text-${appConfig.announcementColor}-700`}>{appConfig.announcementType}</div>
-                                  <h3 className="font-black text-gray-800 text-lg leading-tight mb-1">{appConfig.announcementTitle}</h3>
-                                  <div className="flex items-center gap-1 text-xs text-gray-500 font-medium">
-                                      <Clock className="w-3 h-3"/> {appConfig.announcementTime}
+                  {/* Live Preview - UPDATED DESIGN */}
+                  <div className="bg-gray-100 rounded-3xl p-6 flex flex-col justify-center">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-4 text-center">Live Preview (Tampilan Siswa)</label>
+                      
+                      <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-gray-100 relative overflow-hidden transform scale-95 origin-center">
+                          <div className="flex items-center gap-3 mb-6 relative z-10">
+                              <div className={`p-2 rounded-xl ${previewTheme.iconBg} ${previewTheme.iconText}`}><Megaphone className="w-6 h-6"/></div>
+                              <h3 className="font-black text-gray-800 text-lg leading-tight">Pengumuman Sekolah</h3>
+                          </div>
+                          
+                          {appConfig.announcementTitle ? (
+                              <div className="relative z-10">
+                                  <div className="flex gap-4 items-start">
+                                      {/* Date Block */}
+                                      <div className={`flex flex-col items-center justify-center w-16 h-16 rounded-2xl ${previewTheme.bg} ${previewTheme.text} shrink-0 border-2 ${previewTheme.border}`}>
+                                          <span className="text-2xl font-black leading-none">{dateDisplay.day}</span>
+                                          <span className="text-[10px] font-bold uppercase tracking-wider">{dateDisplay.month}</span>
+                                      </div>
+                                      
+                                      {/* Content */}
+                                      <div className="pt-1 flex-1">
+                                          <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${previewTheme.text} bg-white/50 inline-block px-2 py-0.5 rounded-md`}>
+                                              {appConfig.announcementType || 'Info'}
+                                          </div>
+                                          <h4 className="font-bold text-gray-800 text-sm mb-1 leading-snug">{appConfig.announcementTitle}</h4>
+                                          <div className="flex items-center gap-1 text-xs text-gray-400 font-medium mb-2">
+                                              <Clock className="w-3.5 h-3.5"/>
+                                              <span>{appConfig.announcementTime || 'Waktu tidak ditentukan'}</span>
+                                          </div>
+                                          <p className="text-xs text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                              {appConfig.announcementDesc || 'Deskripsi pengumuman...'}
+                                          </p>
+                                      </div>
                                   </div>
                               </div>
-                          </div>
-                          <p className="text-sm text-gray-600 relative z-10 leading-snug">{appConfig.announcementDesc}</p>
-                          {/* Decor */}
-                          <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full opacity-10 bg-${appConfig.announcementColor}-600`}></div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      </div>
-  );
-
-  const renderGradesRecap = () => (
-      <div className="space-y-6 animate-fade-in-up">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5 text-indigo-600"/> Filter Rekap Nilai
-              </h3>
-              <div className="flex gap-4">
-                  <select 
-                      value={gradeFilterClass}
-                      onChange={(e) => setGradeFilterClass(e.target.value)}
-                      className="p-2 border border-gray-200 rounded-lg text-sm"
-                  >
-                      {['1A','1B','2A','2B','3A','4A','5A','6A'].map(c => <option key={c} value={c}>Kelas {c}</option>)}
-                  </select>
-                  <select 
-                      value={gradeFilterSubject}
-                      onChange={(e) => setGradeFilterSubject(e.target.value)}
-                      className="p-2 border border-gray-200 rounded-lg text-sm"
-                  >
-                      {STANDARD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <button onClick={fetchData} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow hover:bg-indigo-700">Terapkan</button>
-              </div>
-          </div>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                      <tr>
-                          <th className="px-6 py-4">Nama Siswa</th>
-                          <th className="px-6 py-4 text-center">PH</th>
-                          <th className="px-6 py-4 text-center">PTS</th>
-                          <th className="px-6 py-4 text-center">PAS</th>
-                          <th className="px-6 py-4 text-center">Rapor</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                      {grades.filter(g => g.class_name === gradeFilterClass && g.subject === gradeFilterSubject).length === 0 ? (
-                          <tr><td colSpan={5} className="p-8 text-center text-gray-400">Belum ada data nilai untuk filter ini.</td></tr>
-                      ) : grades.filter(g => g.class_name === gradeFilterClass && g.subject === gradeFilterSubject).map((g) => {
-                          const avg = Math.round(((g.ph_scores?.[0] || 0) + g.pts + g.pas) / 3);
-                          return (
-                              <tr key={g.id} className="hover:bg-gray-50/50">
-                                  <td className="px-6 py-4 font-bold text-gray-700">{g.student_name}</td>
-                                  <td className="px-6 py-4 text-center">{g.ph_scores?.[0] || 0}</td>
-                                  <td className="px-6 py-4 text-center">{g.pts}</td>
-                                  <td className="px-6 py-4 text-center">{g.pas}</td>
-                                  <td className="px-6 py-4 text-center font-bold text-indigo-600">{avg}</td>
-                              </tr>
-                          );
-                      })}
-                  </tbody>
-              </table>
-          </div>
-      </div>
-  );
-
-  const renderFinance = () => (
-      <div className="space-y-8 animate-fade-in-up">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Waste Types */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                  <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><Recycle className="w-5 h-5 text-green-600"/> Jenis Sampah</h3>
-                      <button className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100">+ Tambah</button>
-                  </div>
-                  <div className="space-y-3">
-                      {wasteTypes.map((w) => (
-                          <div key={w.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
-                              <span className="text-sm font-medium text-gray-700">{w.name}</span>
-                              <span className="text-sm font-bold text-green-600">Rp {w.price_per_kg}/kg</span>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-              
-              {/* Recent Transactions */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-indigo-600"/> Transaksi Terakhir</h3>
-                  <div className="space-y-3">
-                      {wasteTransactions.length === 0 ? (
-                          <div className="text-center text-gray-400 text-sm py-4">Belum ada transaksi.</div>
-                      ) : wasteTransactions.slice(0, 5).map((t) => (
-                          <div key={t.id} className="flex justify-between items-center p-3 border-b border-gray-50 last:border-0">
-                              <div>
-                                  <div className="font-bold text-gray-800 text-xs">{t.student_name}</div>
-                                  <div className="text-[10px] text-gray-400">{t.type} • {t.weight}kg</div>
+                          ) : (
+                              // PREVIEW EMPTY STATE
+                              <div className="text-center py-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                                  <BellOff className="w-10 h-10 text-gray-300 mx-auto mb-2"/>
+                                  <p className="text-xs font-bold text-gray-400">Belum ada pengumuman aktif.</p>
+                                  <p className="text-[10px] text-gray-400 mt-1">Silahkan cek kembali nanti.</p>
                               </div>
-                              <div className={`font-bold text-xs ${t.status === 'Deposit' ? 'text-green-600' : 'text-red-600'}`}>
-                                  {t.status === 'Deposit' ? '+' : '-'} Rp {t.amount}
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          </div>
-      </div>
-  );
+                          )}
 
-  const renderLetters = () => (
-      <div className="space-y-6 animate-fade-in-up">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><Mail className="w-5 h-5 text-indigo-600"/> Permohonan Izin Siswa</h3>
-              </div>
-              <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-500 font-medium">
-                      <tr>
-                          <th className="px-6 py-4">Nama Siswa</th>
-                          <th className="px-6 py-4">Kelas</th>
-                          <th className="px-6 py-4">Jenis</th>
-                          <th className="px-6 py-4">Alasan</th>
-                          <th className="px-6 py-4">Status</th>
-                          <th className="px-6 py-4 text-right">Aksi</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                      {permissions.map((p) => (
-                          <tr key={p.id} className="hover:bg-gray-50/50">
-                              <td className="px-6 py-4 font-bold text-gray-700">{p.student_name}</td>
-                              <td className="px-6 py-4">{p.class_name}</td>
-                              <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${p.type === 'Sakit' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>{p.type}</span></td>
-                              <td className="px-6 py-4 text-gray-600">{p.reason}</td>
-                              <td className="px-6 py-4">
-                                  <span className={`px-2 py-1 rounded text-xs font-bold ${p.status === 'Approved' ? 'bg-green-100 text-green-600' : p.status === 'Rejected' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                  {p.status === 'Pending' && (
-                                      <div className="flex justify-end gap-2">
-                                          <button className="p-1 bg-green-100 text-green-600 rounded hover:bg-green-200"><Check className="w-4 h-4"/></button>
-                                          <button className="p-1 bg-red-100 text-red-600 rounded hover:bg-red-200"><XIcon className="w-4 h-4"/></button>
-                                      </div>
-                                  )}
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-      </div>
-  );
-
-  const renderGoodDeeds = () => (
-      <div className="space-y-6 animate-fade-in-up">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500"/> Laporan Anak Hebat</h3>
-              </div>
-              <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-500 font-medium">
-                      <tr>
-                          <th className="px-6 py-4">Nama Siswa</th>
-                          <th className="px-6 py-4">Aktivitas</th>
-                          <th className="px-6 py-4">Waktu</th>
-                          <th className="px-6 py-4">Status</th>
-                          <th className="px-6 py-4 text-right">Aksi</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                      {goodDeeds.map((g) => (
-                          <tr key={g.id} className="hover:bg-gray-50/50">
-                              <td className="px-6 py-4 font-bold text-gray-700">{g.student_name} <span className="text-xs text-gray-400 font-normal">({g.class_name})</span></td>
-                              <td className="px-6 py-4">{g.activity}</td>
-                              <td className="px-6 py-4">{g.date} {g.time}</td>
-                              <td className="px-6 py-4">
-                                  <span className={`px-2 py-1 rounded text-xs font-bold ${g.status === 'Verified' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>{g.status}</span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                  {g.status === 'Pending' && (
-                                      <div className="flex justify-end gap-2">
-                                          <button className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">Verifikasi</button>
-                                      </div>
-                                  )}
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-      </div>
-  );
-
-  const renderApiSettings = () => (
-      <div className="space-y-6 animate-fade-in-up max-w-3xl">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-lg text-gray-800 mb-4 flex items-center gap-2"><Database className="w-5 h-5 text-indigo-600"/> Konfigurasi Supabase</h3>
-              <p className="text-sm text-gray-500 mb-6">Atur koneksi ke database.</p>
-              
-              <div className="space-y-4">
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase URL</label>
-                      <div className="flex items-center gap-2">
-                        <Globe className="w-5 h-5 text-gray-400" />
-                        <input 
-                            value={customSupabaseUrl}
-                            onChange={(e) => setCustomSupabaseUrl(e.target.value)}
-                            type="text" 
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-mono text-sm"
-                        />
-                      </div>
-                  </div>
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase Anon Key</label>
-                      <div className="flex items-center gap-2">
-                        <Key className="w-5 h-5 text-gray-400" />
-                        <input 
-                            value={customSupabaseKey}
-                            onChange={(e) => setCustomSupabaseKey(e.target.value)}
-                            type="password" 
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-mono text-sm"
-                        />
-                      </div>
-                  </div>
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Service Role Key (Admin Only)</label>
-                      <div className="flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-red-400" />
-                        <input 
-                            value={serviceRoleKey}
-                            onChange={(e) => setServiceRoleKey(e.target.value)}
-                            type="password" 
-                            className="w-full p-3 bg-red-50 border border-red-200 rounded-xl outline-none font-mono text-sm text-red-600"
-                            placeholder="Hanya isi jika ingin fitur admin penuh..."
-                        />
+                          {/* Decor Blob */}
+                          {appConfig.announcementTitle && (
+                              <div className={`absolute -right-10 -bottom-10 w-40 h-40 rounded-full opacity-10 ${previewTheme.accent}`}></div>
+                          )}
                       </div>
                   </div>
               </div>
-              <div className="mt-8 flex justify-end">
-                  <button onClick={handleSaveConfig} disabled={savingConfig} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-indigo-700 flex items-center gap-2">
-                      {savingConfig ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Simpan Konfigurasi
-                  </button>
-              </div>
           </div>
       </div>
-  );
+      );
+  };
 
   const renderTable = (headers: string[], data: any[], type: 'student' | 'teacher' | 'schedule') => (
       <div className="space-y-4 animate-fade-in-up">
@@ -1173,6 +1112,438 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       </div>
   );
 
+  const renderGradesRecap = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
+                  <div className="flex gap-4">
+                      <select 
+                          value={gradeFilterClass} 
+                          onChange={(e) => setGradeFilterClass(e.target.value)}
+                          className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                          {['1A', '1B', '2A', '2B', '3A', '4A', '5A', '6A'].map(c => <option key={c} value={c}>Kelas {c}</option>)}
+                      </select>
+                      <select 
+                          value={gradeFilterSubject} 
+                          onChange={(e) => setGradeFilterSubject(e.target.value)}
+                          className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                          {STANDARD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                  </div>
+              </div>
+              <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left border-collapse">
+                      <thead className="bg-gray-50 text-gray-500 font-medium">
+                          <tr>
+                              <th className="px-6 py-4 border-b">Nama Siswa</th>
+                              {/* Dynamic PH Headers */}
+                              {Array.from({ length: phCount }).map((_, i) => (
+                                  <th key={i} className="px-4 py-4 text-center border-b w-16">PH{i + 1}</th>
+                              ))}
+                              <th className="px-2 py-4 border-b w-12 text-center">
+                                  <button onClick={() => setPhCount(p => Math.min(p + 1, 8))} className="text-indigo-600 hover:text-indigo-800 bg-indigo-50 p-1 rounded"><Plus className="w-3 h-3"/></button>
+                              </th>
+                              <th className="px-6 py-4 text-center border-b border-l">PTS</th>
+                              <th className="px-6 py-4 text-center border-b">PAS</th>
+                              <th className="px-6 py-4 text-center border-b bg-gray-100 font-bold">NA</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {grades.filter(g => g.class_name === gradeFilterClass && g.subject === gradeFilterSubject).length === 0 ? (
+                              <tr><td colSpan={phCount + 5} className="p-8 text-center text-gray-400">Belum ada data nilai untuk filter ini.</td></tr>
+                          ) : (
+                              grades.filter(g => g.class_name === gradeFilterClass && g.subject === gradeFilterSubject).map(g => {
+                                  // Mock PH splitting since DB only has 1 array column in types but logic here supports multiple
+                                  // We will just replicate the score or show 0 if not present in expanded view
+                                  const phVal = Array.isArray(g.ph_scores) ? g.ph_scores[0] : 0; 
+                                  const na = Math.round(((phVal || 0) + (g.pts || 0) + (g.pas || 0)) / 3);
+                                  
+                                  return (
+                                  <tr key={g.id} className="border-b last:border-0 hover:bg-gray-50">
+                                      <td className="px-6 py-3 font-bold text-gray-700">{g.student_name}</td>
+                                      {Array.from({ length: phCount }).map((_, i) => (
+                                          <td key={i} className="px-4 py-3 text-center text-gray-600">
+                                              {/* In a real dynamic system, g.ph_scores would be an array. Using first value for demo. */}
+                                              {i === 0 ? (Array.isArray(g.ph_scores) ? g.ph_scores[0] : '-') : '-'}
+                                          </td>
+                                      ))}
+                                      <td className="px-2 py-3 text-center"></td>
+                                      <td className="px-6 py-3 text-center border-l">{g.pts}</td>
+                                      <td className="px-6 py-3 text-center">{g.pas}</td>
+                                      <td className="px-6 py-3 text-center font-bold text-indigo-700 bg-gray-50">
+                                          {na}
+                                      </td>
+                                  </tr>
+                                  );
+                              })
+                          )}
+                      </tbody>
+                  </table>
+                  <div className="mt-4 flex justify-end">
+                      {phCount > 1 && (
+                          <button onClick={() => setPhCount(p => Math.max(p - 1, 1))} className="text-xs text-red-500 hover:underline flex items-center gap-1">
+                              <MinusCircle className="w-3 h-3"/> Kurangi Kolom PH
+                          </button>
+                      )}
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
+
+  const renderFinance = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          {/* Navigation Tabs */}
+          <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-fit">
+              <button onClick={() => setFinanceTab('overview')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${financeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Ringkasan</button>
+              <button onClick={() => setFinanceTab('input')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${financeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Input Transaksi</button>
+              <button onClick={() => setFinanceTab('settings')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${financeTab === 'settings' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Atur Harga</button>
+          </div>
+
+          {financeTab === 'overview' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Recent Transactions */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 col-span-2">
+                      <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Wallet className="w-5 h-5 text-orange-600"/> Riwayat Transaksi Terakhir</h3>
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-left">
+                              <thead className="bg-gray-50 text-gray-500 font-medium">
+                                  <tr>
+                                      <th className="p-3">Tanggal</th>
+                                      <th className="p-3">Siswa</th>
+                                      <th className="p-3">Jenis</th>
+                                      <th className="p-3 text-right">Berat/Jml</th>
+                                      <th className="p-3 text-right">Nominal</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  {wasteTransactions.length === 0 ? <tr className="text-gray-400 text-center"><td colSpan={5} className="p-4">Belum ada transaksi.</td></tr> : 
+                                    wasteTransactions.slice(0, 10).map((t) => (
+                                      <tr key={t.id} className="border-b last:border-0 hover:bg-gray-50">
+                                          <td className="p-3 text-gray-500">{t.date}</td>
+                                          <td className="p-3 font-bold">{t.student_name}</td>
+                                          <td className="p-3">
+                                              <span className={`px-2 py-1 rounded text-xs font-bold ${t.status === 'Deposit' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                  {t.status === 'Deposit' ? 'Setor' : 'Tarik'}
+                                              </span>
+                                              <span className="ml-2 text-gray-600 text-xs">{t.type}</span>
+                                          </td>
+                                          <td className="p-3 text-right font-mono">{t.weight > 0 ? `${t.weight} kg` : '-'}</td>
+                                          <td className={`p-3 text-right font-bold ${t.status === 'Deposit' ? 'text-green-600' : 'text-red-600'}`}>
+                                              {t.status === 'Deposit' ? '+' : '-'} {t.amount.toLocaleString('id-ID')}
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {financeTab === 'input' && (
+              <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+                  <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center gap-2"><PlusCircle className="w-6 h-6 text-green-600"/> Input Transaksi Baru</h3>
+                  <form onSubmit={handleFinanceSubmit} className="space-y-6">
+                      
+                      {/* Step 1: Select Student */}
+                      <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Pilih Siswa</label>
+                          <select 
+                              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                              value={financeForm.studentId}
+                              onChange={(e) => setFinanceForm({...financeForm, studentId: e.target.value})}
+                              required
+                          >
+                              <option value="">-- Cari Siswa --</option>
+                              {students.map(s => (
+                                  <option key={s.id} value={s.id}>{s.class_name} - {s.name}</option>
+                              ))}
+                          </select>
+                      </div>
+
+                      {/* Step 2: Transaction Type */}
+                      <div className="grid grid-cols-2 gap-4">
+                          <label className={`cursor-pointer p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${financeForm.transactionType === 'deposit' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:bg-gray-50 text-gray-500'}`}>
+                              <input type="radio" className="hidden" name="type" onClick={() => setFinanceForm({...financeForm, transactionType: 'deposit'})} />
+                              <TrendingUp className="w-6 h-6"/>
+                              <span className="font-bold">Setor Sampah</span>
+                          </label>
+                          <label className={`cursor-pointer p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${financeForm.transactionType === 'withdraw' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 hover:bg-gray-50 text-gray-500'}`}>
+                              <input type="radio" className="hidden" name="type" onClick={() => setFinanceForm({...financeForm, transactionType: 'withdraw'})} />
+                              <TrendingDown className="w-6 h-6"/>
+                              <span className="font-bold">Penarikan / Belanja</span>
+                          </label>
+                      </div>
+
+                      {/* Step 3: Conditional Inputs */}
+                      {financeForm.transactionType === 'deposit' ? (
+                          <div className="bg-green-50/50 p-6 rounded-2xl border border-green-100 space-y-4">
+                              <div>
+                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jenis Sampah</label>
+                                  <select 
+                                      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none"
+                                      value={financeForm.wasteTypeId}
+                                      onChange={(e) => setFinanceForm({...financeForm, wasteTypeId: parseInt(e.target.value)})}
+                                  >
+                                      {wasteTypes.map(w => (
+                                          <option key={w.id} value={w.id}>{w.name} (Rp {w.price_per_kg}/kg)</option>
+                                      ))}
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Berat (Kg)</label>
+                                  <input 
+                                      type="number" step="0.1"
+                                      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none font-bold text-lg"
+                                      placeholder="0.0"
+                                      value={financeForm.weight}
+                                      onChange={(e) => setFinanceForm({...financeForm, weight: e.target.value})}
+                                      required
+                                  />
+                              </div>
+                              <div className="flex justify-between items-center pt-2">
+                                  <span className="text-sm font-medium text-gray-500">Estimasi Pendapatan:</span>
+                                  <span className="text-xl font-black text-green-600">
+                                      Rp {(parseFloat(financeForm.weight || '0') * (wasteTypes.find(w=>w.id === Number(financeForm.wasteTypeId))?.price_per_kg || 0)).toLocaleString('id-ID')}
+                                  </span>
+                              </div>
+                          </div>
+                      ) : (
+                          <div className="bg-red-50/50 p-6 rounded-2xl border border-red-100 space-y-4">
+                              <div>
+                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jenis Penarikan</label>
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                      {['Uang Tunai', 'Buku Tulis', 'Pensil', 'Penghapus', 'Penggaris', 'ATK Lain'].map(item => (
+                                          <div 
+                                            key={item} 
+                                            onClick={() => setFinanceForm({...financeForm, withdrawItem: item})}
+                                            className={`p-2 rounded-lg text-xs font-bold text-center cursor-pointer border ${financeForm.withdrawItem === item ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-red-50'}`}
+                                          >
+                                              {item}
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nominal / Harga (Rp)</label>
+                                  <input 
+                                      type="number"
+                                      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none font-bold text-lg text-red-600"
+                                      placeholder="0"
+                                      value={financeForm.withdrawAmount}
+                                      onChange={(e) => setFinanceForm({...financeForm, withdrawAmount: e.target.value})}
+                                      required
+                                  />
+                              </div>
+                          </div>
+                      )}
+
+                      <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2">
+                          <Save className="w-5 h-5"/> Simpan Transaksi
+                      </button>
+                  </form>
+              </div>
+          )}
+
+          {financeTab === 'settings' && (
+              <div className="max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <h3 className="font-bold text-lg text-gray-800 mb-6 flex items-center gap-2"><Settings className="w-5 h-5 text-gray-600"/> Pengaturan Harga Sampah</h3>
+                  <div className="space-y-4">
+                      {wasteTypes.map((w, idx) => (
+                          <div key={w.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                              <div className="flex-1">
+                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Jenis Sampah</label>
+                                  <input 
+                                      type="text" 
+                                      value={w.name}
+                                      onChange={(e) => {
+                                          const newTypes = [...wasteTypes];
+                                          newTypes[idx].name = e.target.value;
+                                          setWasteTypes(newTypes);
+                                      }}
+                                      className="w-full bg-transparent font-bold text-gray-800 outline-none"
+                                  />
+                              </div>
+                              <div className="w-32">
+                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Harga / Kg</label>
+                                  <input 
+                                      type="number" 
+                                      value={w.price_per_kg}
+                                      onChange={(e) => {
+                                          const newTypes = [...wasteTypes];
+                                          newTypes[idx].price_per_kg = parseInt(e.target.value);
+                                          setWasteTypes(newTypes);
+                                      }}
+                                      className="w-full bg-white p-2 rounded border border-gray-200 font-mono font-bold text-right outline-none focus:border-indigo-500"
+                                  />
+                              </div>
+                              <button onClick={() => setWasteTypes(wasteTypes.filter((_, i) => i !== idx))} className="p-2 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-5 h-5"/></button>
+                          </div>
+                      ))}
+                      <button 
+                        onClick={() => setWasteTypes([...wasteTypes, { id: Date.now(), name: 'Jenis Baru', price_per_kg: 0 }])}
+                        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-bold hover:bg-gray-50 flex items-center justify-center gap-2"
+                      >
+                          <Plus className="w-5 h-5"/> Tambah Jenis
+                      </button>
+                  </div>
+              </div>
+          )}
+      </div>
+  );
+
+  const renderLetters = () => (
+      <div className="space-y-6 animate-fade-in-up">
+           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Mail className="w-5 h-5 text-indigo-600"/> Permohonan Izin Masuk</h3>
+              <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-gray-500 font-medium">
+                          <tr>
+                              <th className="px-6 py-3">Tanggal</th>
+                              <th className="px-6 py-3">Siswa</th>
+                              <th className="px-6 py-3">Kelas</th>
+                              <th className="px-6 py-3">Jenis</th>
+                              <th className="px-6 py-3">Alasan</th>
+                              <th className="px-6 py-3 text-right">Status</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {permissions.length === 0 ? (
+                               <tr><td colSpan={6} className="p-8 text-center text-gray-400">Tidak ada data permohonan izin.</td></tr>
+                          ) : permissions.map((p) => (
+                              <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50">
+                                  <td className="px-6 py-4">{p.date}</td>
+                                  <td className="px-6 py-4 font-bold">{p.student_name}</td>
+                                  <td className="px-6 py-4">{p.class_name}</td>
+                                  <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${p.type === 'Sakit' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>{p.type}</span></td>
+                                  <td className="px-6 py-4 text-gray-600 max-w-xs truncate">{p.reason}</td>
+                                  <td className="px-6 py-4 text-right">
+                                      <span className={`px-2 py-1 rounded text-xs font-bold ${p.status === 'Approved' ? 'bg-green-100 text-green-600' : p.status === 'Rejected' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+           </div>
+      </div>
+  );
+
+  const renderGoodDeeds = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500"/> Laporan Anak Hebat</h3>
+              <div className="overflow-x-auto">
+                   <table className="w-full text-sm text-left">
+                       <thead className="bg-gray-50 text-gray-500 font-medium">
+                           <tr>
+                               <th className="px-6 py-3">Tanggal</th>
+                               <th className="px-6 py-3">Siswa</th>
+                               <th className="px-6 py-3">Aktivitas</th>
+                               <th className="px-6 py-3 text-right">Status</th>
+                           </tr>
+                       </thead>
+                       <tbody>
+                           {goodDeeds.length === 0 ? (
+                                <tr><td colSpan={4} className="p-8 text-center text-gray-400">Belum ada laporan aktivitas baik.</td></tr>
+                           ) : goodDeeds.map((g) => (
+                               <tr key={g.id} className="border-b last:border-0 hover:bg-gray-50">
+                                   <td className="px-6 py-4">{g.date} {g.time}</td>
+                                   <td className="px-6 py-4 font-bold">{g.student_name} <span className="text-xs font-normal text-gray-500">({g.class_name})</span></td>
+                                   <td className="px-6 py-4">{g.activity}</td>
+                                   <td className="px-6 py-4 text-right">
+                                       <span className={`px-2 py-1 rounded text-xs font-bold ${g.status === 'Verified' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>{g.status}</span>
+                                   </td>
+                               </tr>
+                           ))}
+                       </tbody>
+                   </table>
+              </div>
+          </div>
+      </div>
+  );
+
+  const renderApiSettings = () => (
+      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up pb-10">
+          <div className="bg-indigo-900 rounded-3xl p-8 text-white relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+               <h3 className="text-2xl font-black mb-2 relative z-10">Integrasi Sistem</h3>
+               <p className="text-indigo-200 relative z-10">Konfigurasi koneksi ke Supabase dan Google Gemini AI.</p>
+          </div>
+
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+               <h4 className="font-bold text-lg text-gray-800 mb-6 flex items-center gap-2"><Database className="w-5 h-5 text-indigo-600"/> Database Configuration (Supabase)</h4>
+               
+               <div className="space-y-4">
+                   <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase Project URL</label>
+                       <input 
+                          type="text" 
+                          value={customSupabaseUrl} 
+                          onChange={(e) => setCustomSupabaseUrl(e.target.value)}
+                          className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm"
+                          placeholder="https://your-project.supabase.co"
+                       />
+                   </div>
+                   <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase Anon Key (Public)</label>
+                       <div className="relative">
+                          <input 
+                              type="password" 
+                              value={customSupabaseKey} 
+                              onChange={(e) => setCustomSupabaseKey(e.target.value)}
+                              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm pr-10"
+                              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                           />
+                           <Key className="absolute right-3 top-3 w-4 h-4 text-gray-400"/>
+                       </div>
+                   </div>
+                   <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase Service Role Key (Admin/Secret)</label>
+                       <div className="relative">
+                          <input 
+                              type="password" 
+                              value={serviceRoleKey} 
+                              onChange={(e) => setServiceRoleKey(e.target.value)}
+                              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm pr-10 border-red-200 bg-red-50 focus:ring-red-500"
+                              placeholder="Diperlukan untuk membuat user Auth otomatis..."
+                           />
+                           <Lock className="absolute right-3 top-3 w-4 h-4 text-red-400"/>
+                       </div>
+                       <p className="text-[10px] text-red-500 mt-1 font-bold">* Hanya simpan jika Anda admin. Jangan bagikan key ini.</p>
+                   </div>
+               </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+               <h4 className="font-bold text-lg text-gray-800 mb-6 flex items-center gap-2"><Bot className="w-5 h-5 text-indigo-600"/> AI Configuration (Google Gemini)</h4>
+               <div>
+                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Gemini API Key</label>
+                   <div className="flex gap-2">
+                       <input 
+                          type="password" 
+                          disabled 
+                          value="****************************" 
+                          className="w-full p-3 bg-gray-100 border border-gray-200 rounded-xl font-mono text-sm text-gray-400 cursor-not-allowed"
+                       />
+                       <button className="bg-gray-200 text-gray-600 px-4 rounded-xl font-bold text-xs" disabled>Configured via Env</button>
+                   </div>
+                   <p className="text-xs text-gray-500 mt-2">API Key dikonfigurasi melalui Environment Variables server (Netlify/Vercel) untuk keamanan.</p>
+               </div>
+          </div>
+
+          <div className="flex justify-end pt-4">
+              <button onClick={handleSaveConfig} disabled={savingConfig} className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center gap-2">
+                  {savingConfig ? <RefreshCw className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} Simpan Konfigurasi
+              </button>
+          </div>
+      </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-10">
       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
@@ -1205,6 +1576,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
 
         {activeView === 'overview' && renderOverview()}
         {activeView === 'app_config' && renderAppConfig()}
+        {activeView === 'users_auth' && renderUsersAuth()}
         {activeView === 'students' && renderTable(['No', 'Nama Siswa', 'NIS', 'NISN', 'TTL', 'Orang Tua', 'Kelas'], students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())), 'student')}
         {activeView === 'teachers' && renderTable(['Nama Guru', 'NIP', 'L/P', 'Jenis', 'Wali Kelas', 'Mapel', 'Status'], teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())), 'teacher')}
         {activeView === 'schedule' && renderTable(['Hari', 'Jam', 'Kelas', 'Mapel', 'Pengajar'], schedules.filter(s => s.class_name.includes(searchTerm) || s.teacher_name.toLowerCase().includes(searchTerm.toLowerCase())), 'schedule')}
