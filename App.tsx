@@ -6,66 +6,98 @@ import SuperAdminDashboard from './components/SuperAdminDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import StudentDashboard from './components/StudentDashboard';
 import JournalForm from './components/JournalForm';
-import { Download, X } from 'lucide-react';
+import { Download, X, Smartphone } from 'lucide-react';
 
 const InstallPWA = () => {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isVisible, setIsVisible] = useState(false);
+    const [isIOS, setIsIOS] = useState(false);
 
     useEffect(() => {
-        // Listen to the beforeinstallprompt event
+        // Detect iOS
+        const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+        setIsIOS(isIosDevice);
+
+        // Listen to the beforeinstallprompt event (Android/Chrome)
         const handleBeforeInstallPrompt = (e: any) => {
             e.preventDefault();
             setDeferredPrompt(e);
+            setIsVisible(true); // Show immediately when browser says it's installable
         };
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-        // Timer for 20 seconds
+        // Timer to show prompt/instruction if event doesn't fire (e.g. iOS or PWA already installable but event missed)
+        // We use a short delay so it doesn't annoy user immediately upon load
         const timer = setTimeout(() => {
-            setIsVisible(true);
-        }, 20000);
+            // If prompt hasn't fired yet, show manual instructions (useful for iOS)
+            if (!deferredPrompt) {
+               setIsVisible(true);
+            }
+        }, 3000);
 
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
             clearTimeout(timer);
         };
-    }, []);
+    }, [deferredPrompt]);
 
     const handleInstallClick = async () => {
         if (deferredPrompt) {
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
             console.log(`User response to the install prompt: ${outcome}`);
-            setDeferredPrompt(null);
+            if (outcome === 'accepted') {
+                setDeferredPrompt(null);
+                setIsVisible(false);
+            }
         } else {
-            // Fallback instruction for browsers/environments where the prompt isn't automated
-            alert("Untuk menginstall aplikasi:\n\n1. Ketuk menu browser (titik tiga ⋮ atau ikon Share)\n2. Pilih 'Tambahkan ke Layar Utama' atau 'Install App'");
+            // Manual Instructions for iOS or non-supported browsers
+            const msg = isIOS 
+                ? "Untuk menginstall aplikasi di iPhone/iPad:\n\n1. Ketuk tombol Share (ikon kotak dengan panah ke atas) di bawah layar Safari.\n2. Gulir ke bawah dan pilih 'Tambah ke Layar Utama' (Add to Home Screen)."
+                : "Untuk menginstall aplikasi:\n\n1. Ketuk menu browser (titik tiga ⋮ di pojok kanan atas).\n2. Pilih 'Tambahkan ke Layar Utama' atau 'Install App'.";
+            alert(msg);
         }
-        setIsVisible(false);
     };
 
     if (!isVisible) return null;
 
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] animate-fade-in-up">
-            <button
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-fade-in-up w-[90%] max-w-sm">
+            <div
+                className="flex items-center justify-between pl-4 pr-3 py-3 bg-[#0F2167] text-white rounded-2xl shadow-2xl shadow-blue-900/40 border border-white/10 backdrop-blur-md cursor-pointer"
                 onClick={handleInstallClick}
-                className="flex items-center gap-2 pl-3 pr-2 py-2 bg-white/90 backdrop-blur-md border border-gray-200 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-xl transition-all hover:-translate-y-0.5 active:scale-95 group"
             >
-                <div className="bg-blue-50 text-blue-600 p-1 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <Download className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-3">
+                    <div className="bg-white/10 p-2 rounded-xl animate-pulse">
+                        <Smartphone className="w-6 h-6 text-yellow-400" />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-medium text-blue-200 uppercase tracking-wide">Aplikasi Sekolah</span>
+                        <span className="text-sm font-bold">Install BISMA App</span>
+                    </div>
                 </div>
-                <span className="text-sm font-sans font-medium text-gray-700 group-hover:text-gray-900 pr-1">Install</span>
                 
-                <div className="w-px h-3 bg-gray-300 mx-1"></div>
-                
-                <div 
-                    onClick={(e) => { e.stopPropagation(); setIsVisible(false); }}
-                    className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-500 transition-colors"
-                >
-                    <X className="w-3 h-3" />
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleInstallClick();
+                        }}
+                        className="bg-yellow-500 hover:bg-yellow-400 text-[#0F2167] text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                        Install
+                    </button>
+                    <button 
+                        onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setIsVisible(false); 
+                        }}
+                        className="p-1 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
-            </button>
+            </div>
         </div>
     );
 };
