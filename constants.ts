@@ -15,9 +15,4 @@ export const MENU_ITEMS = [
   { id: 'presensi_qr', label: 'Scan QR', icon: 'QrCode', color: 'text-[#5865F2]' }, // Brand Blue
 ];
 
-export const MOCK_STUDENTS_FALLBACK = [
-  { id: 1, nisn: '1001', name: 'Ahmad Dahlan', class_name: 'Kelas 1' },
-  { id: 2, nisn: '1002', name: 'Budi Santoso', class_name: 'Kelas 1' },
-  { id: 3, nisn: '1003', name: 'Citra Kirana', class_name: 'Kelas 2' },
-  { id: 4, nisn: '1004', name: 'Dewi Sartika', class_name: 'Kelas 6' },
-];
+export const MOCK_STUDENTS_FALLBACK: any[] = [];

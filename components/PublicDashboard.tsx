@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LogIn, Users, Calendar, Trophy, Megaphone, Clock, Home, Search, User, Info, MessageCircle, ChevronDown, ChevronUp, X, ArrowLeft, BellOff } from 'lucide-react';
+import { LogIn, Users, Calendar, Trophy, Megaphone, Clock, Home, Search, User, Info, MessageCircle, ChevronDown, ChevronUp, X, ArrowLeft, BellOff, GraduationCap, School } from 'lucide-react';
 import { DashboardStats, AppConfig } from '../types';
 import { supabase } from '../services/supabase';
 
@@ -16,6 +16,8 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
 
   // Dynamic Stats State
   const [classStats, setClassStats] = useState<Record<string, number>>({});
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalTeachers, setTotalTeachers] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
@@ -34,16 +36,30 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
             const { data: studentData, error } = await supabase.from('students').select('class_name');
             
             if (studentData) {
+                setTotalStudents(studentData.length);
                 const stats: Record<string, number> = {};
-                // Initialize common classes with 0 to ensure they appear even if empty
-                ['1A', '1B', '2A', '2B', '3A', '4A', '5A', '6A'].forEach(c => stats[c] = 0);
+                // Initialize standard classes
+                ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'].forEach(c => stats[c] = 0);
                 
                 studentData.forEach((s) => {
-                    const cls = s.class_name || 'Lainnya';
+                    let cls = s.class_name ? s.class_name.toString().trim() : 'Lainnya';
+                    
+                    // Normalize "1" -> "Kelas 1", "5A" -> "Kelas 5A" if needed, or group by prefix
+                    // Logic: If it's a single digit, prepend "Kelas "
+                    if (/^\d+$/.test(cls)) {
+                        cls = `Kelas ${cls}`;
+                    } else if (!cls.toLowerCase().startsWith('kelas')) {
+                        cls = `Kelas ${cls}`;
+                    }
+
                     stats[cls] = (stats[cls] || 0) + 1;
                 });
                 setClassStats(stats);
             }
+
+            // 3. Fetch Teachers Count
+            const { count: teacherCount } = await supabase.from('teachers').select('*', { count: 'exact', head: true });
+            if (teacherCount !== null) setTotalTeachers(teacherCount);
 
         } catch (e) {
             console.error("Error loading data", e);
@@ -152,22 +168,56 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
             {/* Interactive Welcome Card */}
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-blue-100 relative overflow-hidden group">
                  <div className="absolute right-0 top-0 h-full w-2 bg-gradient-to-b from-[#0F2167] to-[#D97706]"></div>
-                 
-                 <h2 className="text-2xl md:text-3xl font-black text-gray-800 mb-2">
-                    Selamat Datang! 👋
-                 </h2>
+                 <h2 className="text-2xl md:text-3xl font-black text-gray-800 mb-2">Selamat Datang! 👋</h2>
                  <p className="text-gray-600 text-sm leading-relaxed">
                      Pantau aktivitas sekolah {appConfig?.schoolName || 'SDN Baujeng 1'} dengan mudah.
                  </p>
             </div>
 
-            {/* Statistik Siswa - DYNAMIC */}
+            {/* --- ONE BOX SUMMARY (NEW) --- */}
+            <div className="bg-gradient-to-br from-[#0F2167] to-[#2563EB] rounded-3xl p-1 shadow-lg relative overflow-hidden text-white">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+                <div className="bg-[#0F2167]/50 backdrop-blur-md rounded-[22px] p-6 relative z-10">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-white/20 rounded-xl"><School className="w-6 h-6 text-yellow-400" /></div>
+                        <h3 className="font-bold text-lg">Total Warga Sekolah</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Students Counter */}
+                        <div className="bg-white/10 rounded-2xl p-4 flex flex-col items-center border border-white/10 hover:bg-white/20 transition-colors">
+                            <div className="flex items-center gap-2 mb-2 text-blue-200 text-xs font-bold uppercase tracking-wider">
+                                <GraduationCap className="w-4 h-4" /> Siswa
+                            </div>
+                            {loadingStats ? (
+                                <div className="h-8 w-16 bg-white/20 rounded animate-pulse"></div>
+                            ) : (
+                                <div className="text-4xl font-black">{totalStudents}</div>
+                            )}
+                        </div>
+
+                        {/* Teachers Counter */}
+                        <div className="bg-white/10 rounded-2xl p-4 flex flex-col items-center border border-white/10 hover:bg-white/20 transition-colors">
+                            <div className="flex items-center gap-2 mb-2 text-yellow-200 text-xs font-bold uppercase tracking-wider">
+                                <Users className="w-4 h-4" /> Guru
+                            </div>
+                            {loadingStats ? (
+                                <div className="h-8 w-16 bg-white/20 rounded animate-pulse"></div>
+                            ) : (
+                                <div className="text-4xl font-black">{totalTeachers}</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Statistik Detail Kelas - DYNAMIC */}
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-gray-100">
                  <div className="flex items-center gap-2 mb-4">
                      <div className="w-8 h-8 bg-blue-100 text-[#0F2167] rounded-full flex items-center justify-center">
                         <Users className="w-5 h-5" />
                      </div>
-                     <h3 className="font-bold text-gray-800 text-lg">Info Kelas & Jumlah Siswa</h3>
+                     <h3 className="font-bold text-gray-800 text-lg">Detail Siswa per Kelas</h3>
                  </div>
                  
                  {loadingStats ? (
@@ -179,7 +229,7 @@ const PublicDashboard: React.FC<PublicDashboardProps> = ({ onLoginClick }) => {
                         {Object.keys(classStats).sort().map((cls) => (
                             <div key={cls} className="bg-white border-2 border-slate-100 rounded-2xl p-2 text-center hover:bg-blue-50 hover:border-blue-200 transition-all cursor-default shadow-sm group">
                                 <div className="text-xl font-black text-[#0F2167] group-hover:text-blue-600 transition-colors">{classStats[cls]}</div>
-                                <div className="text-[10px] text-gray-400 font-bold uppercase mt-1">Kelas {cls}</div>
+                                <div className="text-[10px] text-gray-400 font-bold uppercase mt-1">{cls.replace('Kelas ', 'Kls ')}</div>
                             </div>
                         ))}
                      </div>

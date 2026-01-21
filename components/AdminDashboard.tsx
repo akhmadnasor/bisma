@@ -10,7 +10,7 @@ import {
   Recycle, LayoutTemplate, Trophy, ArrowLeft, Palette, Info, RefreshCw, Trash, ShieldCheck, Link,
   AlertTriangle, FileWarning, XCircle, ShoppingCart, Check, X as XIcon, Image,
   Grid, BellOff, Bot, Wallet, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Package,
-  UserCheck, Shield
+  UserCheck, Shield, Terminal, Activity, BookOpen, Layers, ArrowUpRight
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { AppConfig, TrashTransaction, Grade, WasteType, PermissionRequest, GoodDeedRequest } from '../types';
@@ -33,13 +33,13 @@ interface ImportResult {
 const MENU_CONFIG = [
     { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'app_config', label: 'App & Sekolah', icon: LayoutTemplate },
-    { id: 'users_auth', label: 'User Auth', icon: UserCheck }, // New Auth Menu
+    { id: 'users_auth', label: 'User Auth', icon: UserCheck },
     { id: 'students', label: 'Data Siswa', icon: GraduationCap },
     { id: 'teachers', label: 'Data Guru', icon: Users },
     { id: 'schedule', label: 'Jadwal KBM', icon: CalendarRange },
     { id: 'grades', label: 'Rekap Nilai', icon: FileSpreadsheet },
-    { id: 'finance', label: 'Bank Sampah & Keuangan', icon: Recycle },
-    { id: 'letters', label: 'Persuratan (Izin)', icon: Mail },
+    { id: 'finance', label: 'Bank Sampah', icon: Recycle },
+    { id: 'letters', label: 'Persuratan', icon: Mail },
     { id: 'good_deeds', label: 'Anak Hebat', icon: Star },
     { id: 'api_settings', label: 'API & Integrasi', icon: Database },
 ];
@@ -151,12 +151,13 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
   
   const [savingConfig, setSavingConfig] = useState(false);
 
-  // App Config
+  // App Config with Default Principal
   const [appConfig, setAppConfig] = useState<AppConfig>({
+      id: 1, // Default ID for single row config
       appName: 'BISMA APP',
-      schoolName: 'SDN BAUJENG 1',
-      principalName: 'Drs. Suharto, M.Pd',
-      principalNip: '19680101 199003 1 005',
+      schoolName: 'SDN BAUJENG I BEJI',
+      principalName: 'AKHMAD NASOR, S.Pd',
+      principalNip: '198704082019031001',
       logoUrl1x1: 'https://via.placeholder.com/100',
       logoUrl3x4: 'https://i.imghippo.com/files/kldd1383bkc.png',
       logoUrl4x3: 'https://via.placeholder.com/400x300',
@@ -190,9 +191,25 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
     try {
         const { data: configData } = await supabase.from('app_config').select('*').single();
         if (configData) {
-             setAppConfig(prev => ({ ...prev, ...configData }));
-             if (configData.supabase_url) setCustomSupabaseUrl(configData.supabase_url);
-             if (configData.supabase_anon_key) setCustomSupabaseKey(configData.supabase_anon_key);
+             // Map snake_case from DB to camelCase for state
+             setAppConfig(prev => ({
+                 ...prev,
+                 id: configData.id,
+                 appName: configData.app_name,
+                 schoolName: configData.school_name,
+                 principalName: configData.principal_name || 'AKHMAD NASOR, S.Pd',
+                 principalNip: configData.principal_nip || '198704082019031001',
+                 logoUrl1x1: configData.logo_url_1x1,
+                 logoUrl3x4: configData.logo_url_3x4,
+                 logoUrl4x3: configData.logo_url_4x3,
+                 letterHeadUrl: configData.letterhead_url,
+                 announcementTitle: configData.announcement_title,
+                 announcementType: configData.announcement_type,
+                 announcementDate: configData.announcement_date,
+                 announcementTime: configData.announcement_time,
+                 announcementDesc: configData.announcement_desc,
+                 announcementColor: configData.announcement_color,
+             }));
         }
 
         const { data: sData } = await supabase.from('students').select('*').order('class_name', { ascending: true }).order('name');
@@ -222,7 +239,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
     fetchData();
   }, []);
 
-  // --- CSV Logic & Templates (Kept as is) ---
+  // ... (CSV Parsing and Download logic remains the same) ...
   const parseCSV = (text: string) => {
     const cleanText = text.replace(/^\uFEFF/, '');
     const lines = cleanText.split(/\r\n|\n|\r/).filter(l => l.trim());
@@ -379,22 +396,25 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
           const newLogs: string[] = [];
 
           // Sync Teachers
+          newLogs.push(`[${new Date().toLocaleTimeString()}] Memulai sinkronisasi Guru...`);
           const teacherRes = await createAuthUsers(teachers, 'teacher');
           current += teachers.length;
           setAuthSyncProgress(Math.round((current / total) * 100));
-          newLogs.push(`Guru: ${teacherRes.count} Sukses, ${teacherRes.errors.length} Gagal/Ada.`);
+          newLogs.push(`[${new Date().toLocaleTimeString()}] Guru: ${teacherRes.count} Sukses, ${teacherRes.errors.length} Warning.`);
 
           // Sync Students
-          // Process in chunks to avoid blocking UI too much if many students
+          newLogs.push(`[${new Date().toLocaleTimeString()}] Memulai sinkronisasi Siswa...`);
           const studentRes = await createAuthUsers(students, 'student');
           current += students.length;
           setAuthSyncProgress(100);
-          newLogs.push(`Siswa: ${studentRes.count} Sukses, ${studentRes.errors.length} Gagal/Ada.`);
+          newLogs.push(`[${new Date().toLocaleTimeString()}] Siswa: ${studentRes.count} Sukses, ${studentRes.errors.length} Warning.`);
+          newLogs.push(`[${new Date().toLocaleTimeString()}] Selesai. Total User: ${total}`);
 
           setAuthSyncLogs(newLogs);
-          alert("Sinkronisasi Selesai!");
+          // alert("Sinkronisasi Selesai!");
 
       } catch (e: any) {
+          setAuthSyncLogs(p => [...p, `[ERROR] ${e.message}`]);
           alert("Error Sync: " + e.message);
       } finally {
           setIsAuthSyncing(false);
@@ -430,7 +450,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                       tanggal_lahir: formatDateForDB(row.tanggal_lahir || row['tgl lahir']),
                       nama_ayah: row.nama_ayah || '',
                       nama_ibu: row.nama_ibu || '',
-                      class_name: row.class_name || row['kelas'],
+                      class_name: row.class_name || row['kelas'] || row['class'] || '',
                       status: 'Active',
                       password: row.password || 'siswa'
                   });
@@ -508,13 +528,37 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
   const handleSaveConfig = async () => {
       setSavingConfig(true);
       try {
-          // await supabase.from('app_config').upsert(appConfig);
-          setTimeout(() => {
-              alert("Konfigurasi berhasil disimpan!");
-              setSavingConfig(false);
-          }, 1000);
-      } catch (e) {
-          alert("Gagal menyimpan konfigurasi.");
+          // Map state (camelCase) back to DB columns (snake_case)
+          const dbPayload = {
+              app_name: appConfig.appName,
+              school_name: appConfig.schoolName,
+              principal_name: appConfig.principalName,
+              principal_nip: appConfig.principalNip,
+              logo_url_1x1: appConfig.logoUrl1x1,
+              logo_url_3x4: appConfig.logoUrl3x4,
+              logo_url_4x3: appConfig.logoUrl4x3,
+              letterhead_url: appConfig.letterHeadUrl,
+              announcement_title: appConfig.announcementTitle,
+              announcement_type: appConfig.announcementType,
+              announcement_date: appConfig.announcementDate,
+              announcement_time: appConfig.announcementTime,
+              announcement_desc: appConfig.announcementDesc,
+              announcement_color: appConfig.announcementColor
+          };
+
+          // Upsert to app_config table. Assuming ID 1 or existing ID.
+          const { error } = await supabase.from('app_config').upsert({
+              id: appConfig.id || 1, // Ensure we update the correct row
+              ...dbPayload
+          });
+
+          if (error) throw error;
+
+          alert("Konfigurasi berhasil disimpan dan disinkronkan!");
+      } catch (e: any) {
+          console.error("Save config error:", e);
+          alert("Gagal menyimpan konfigurasi: " + e.message);
+      } finally {
           setSavingConfig(false);
       }
   };
@@ -771,337 +815,172 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
 
   const renderUsersAuth = () => (
       <div className="space-y-6 animate-fade-in-up">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-3xl text-white relative overflow-hidden shadow-lg">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-              <h3 className="text-2xl font-black mb-2 relative z-10">User Authentication Center</h3>
-              <p className="text-blue-100 relative z-10 max-w-xl text-sm leading-relaxed mb-6">
-                  Kelola akun login (Auth) untuk semua siswa dan guru. Sistem ini menggunakan <strong>Supabase Auth</strong> untuk keamanan maksimal.
-                  Pastikan data siswa & guru sudah diinput sebelum melakukan sinkronisasi.
-              </p>
+          {/* Header Card - Jos Jis Style */}
+          <div className="bg-[#0F172A] rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl border border-slate-700">
+              {/* Background Accents */}
+              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full -mr-32 -mt-32 blur-[100px] animate-pulse"></div>
+              <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-cyan-600/10 rounded-full -ml-20 -mb-20 blur-[80px]"></div>
               
-              <div className="flex gap-4 relative z-10">
-                  <div className="flex items-center gap-3 bg-white/20 p-3 rounded-xl backdrop-blur-sm border border-white/20">
-                      <div className="bg-green-400/20 p-2 rounded-lg"><Shield className="w-5 h-5 text-green-300"/></div>
-                      <div>
-                          <div className="text-[10px] font-bold uppercase text-blue-200">Server Status</div>
-                          <div className="font-bold text-white flex items-center gap-2">Active <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span></div>
+              <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div>
+                      <div className="flex items-center gap-3 mb-2">
+                          <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/50">
+                              <Shield className="w-6 h-6 text-indigo-400"/>
+                          </div>
+                          <h3 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                              AUTHENTICATION CENTER
+                          </h3>
                       </div>
+                      <p className="text-slate-400 text-sm max-w-lg leading-relaxed">
+                          Sistem manajemen akses terpusat berbasis Supabase Auth. 
+                          Sinkronisasi data siswa & guru ke server autentikasi dengan keamanan enkripsi tingkat tinggi.
+                      </p>
                   </div>
-                  <div className="flex items-center gap-3 bg-white/20 p-3 rounded-xl backdrop-blur-sm border border-white/20">
-                      <div className="bg-yellow-400/20 p-2 rounded-lg"><Users className="w-5 h-5 text-yellow-300"/></div>
-                      <div>
-                          <div className="text-[10px] font-bold uppercase text-blue-200">Total Users DB</div>
-                          <div className="font-bold text-white">{students.length + teachers.length} User</div>
+
+                  {/* Stats Badges */}
+                  <div className="flex gap-3">
+                      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700 p-4 rounded-2xl flex flex-col items-center min-w-[100px]">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Users</span>
+                          <span className="text-2xl font-mono font-bold text-white">{students.length + teachers.length}</span>
+                      </div>
+                      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700 p-4 rounded-2xl flex flex-col items-center min-w-[100px]">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</span>
+                          <div className="flex items-center gap-2 mt-1">
+                              <div className="w-2 h-2 rounded-full bg-green-500 animate-ping"></div>
+                              <span className="text-xs font-bold text-green-400">ONLINE</span>
+                          </div>
                       </div>
                   </div>
               </div>
           </div>
 
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-center mb-6">
-                  <h4 className="font-bold text-lg text-gray-800 flex items-center gap-2"><RefreshCw className="w-5 h-5 text-indigo-600"/> Sinkronisasi Database ke Auth</h4>
-                  {isAuthSyncing && <span className="text-xs font-bold text-indigo-600 animate-pulse">Sedang Memproses... {authSyncProgress}%</span>}
-              </div>
-
-              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 mb-6 text-center">
-                  <p className="text-gray-500 text-sm mb-4">
-                      Klik tombol di bawah untuk membuat akun login otomatis bagi semua Guru (NIP) dan Siswa (NISN) yang belum terdaftar.
-                      <br/><span className="text-xs text-gray-400">(Password Default: 123456)</span>
-                  </p>
-                  <button 
-                      onClick={handleSyncAuth}
-                      disabled={isAuthSyncing}
-                      className={`px-8 py-4 rounded-xl font-bold text-white shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3 mx-auto ${isAuthSyncing ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700'}`}
-                  >
-                      {isAuthSyncing ? <RefreshCw className="w-5 h-5 animate-spin"/> : <UserCheck className="w-5 h-5"/>}
-                      {isAuthSyncing ? 'Sedang Sinkronisasi...' : 'Sync Database to Auth'}
-                  </button>
-              </div>
-
-              {/* Logs Area */}
-              {authSyncLogs.length > 0 && (
-                  <div className="bg-slate-900 rounded-xl p-4 font-mono text-xs text-green-400 h-40 overflow-y-auto custom-scrollbar border border-slate-800 shadow-inner">
-                      {authSyncLogs.map((log, i) => (
-                          <div key={i} className="mb-1">> {log}</div>
-                      ))}
-                      <div className="animate-pulse">> _</div>
+          {/* Action Panel */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Sync Control */}
+              <div className="lg:col-span-1 bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                  <div>
+                      <h4 className="font-bold text-lg text-slate-800 mb-2 flex items-center gap-2">
+                          <RefreshCw className="w-5 h-5 text-indigo-600"/> Sync Database
+                      </h4>
+                      <p className="text-xs text-slate-500 mb-6">
+                          Generate akun login otomatis untuk Guru (NIP) dan Siswa (NISN) yang belum terdaftar.
+                      </p>
                   </div>
-              )}
+                  
+                  <div className="space-y-4">
+                      {isAuthSyncing && (
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                              <div className="bg-indigo-600 h-2 rounded-full transition-all duration-300" style={{width: `${authSyncProgress}%`}}></div>
+                          </div>
+                      )}
+                      
+                      <button 
+                          onClick={handleSyncAuth}
+                          disabled={isAuthSyncing}
+                          className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-3 relative overflow-hidden group ${isAuthSyncing ? 'bg-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700'}`}
+                      >
+                          {/* Button Shine Effect */}
+                          {!isAuthSyncing && <div className="absolute top-0 -left-full w-full h-full bg-white/20 transform -skew-x-12 group-hover:translate-x-[200%] transition-transform duration-1000"></div>}
+                          
+                          {isAuthSyncing ? <RefreshCw className="w-5 h-5 animate-spin"/> : <UserCheck className="w-5 h-5"/>}
+                          {isAuthSyncing ? `Processing ${authSyncProgress}%` : 'START SYNC ENGINE'}
+                      </button>
+                  </div>
+              </div>
+
+              {/* Terminal Logs */}
+              <div className="lg:col-span-2 bg-[#1E293B] rounded-3xl p-6 shadow-inner border border-slate-700 flex flex-col font-mono relative overflow-hidden">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+                      <Terminal className="w-4 h-4 text-green-400"/>
+                      <span className="text-xs font-bold text-slate-400">SYSTEM LOGS</span>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto custom-scrollbar min-h-[200px] text-xs space-y-1">
+                      {authSyncLogs.length === 0 ? (
+                          <div className="text-slate-600 italic">Waiting for command...</div>
+                      ) : (
+                          authSyncLogs.map((log, i) => (
+                              <div key={i} className="flex gap-2 animate-fade-in-up">
+                                  <span className="text-slate-500">[{new Date().toLocaleTimeString()}]</span>
+                                  <span className={log.includes('Error') ? 'text-red-400' : log.includes('Sukses') ? 'text-green-400' : 'text-blue-300'}>
+                                      {log}
+                                  </span>
+                              </div>
+                          ))
+                      )}
+                      {isAuthSyncing && <div className="text-green-400 animate-pulse">_ processing request...</div>}
+                  </div>
+              </div>
           </div>
       </div>
   );
 
-  // ... (renderAppConfig and renderTable remain largely same, skipping for brevity unless specifically asked to change) ...
-  const renderAppConfig = () => {
-      const previewTheme = getPreviewTheme(appConfig.announcementColor);
-      const date = new Date(appConfig.announcementDate);
-      const dateDisplay = isNaN(date.getTime()) ? { day: '--', month: '---' } : {
-          day: date.getDate(),
-          month: date.toLocaleDateString('id-ID', { month: 'short' }).toUpperCase()
-      };
-
-      return (
-      <div className="space-y-8 animate-fade-in-up pb-10">
-          {/* Identitas Sekolah */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative">
-              <div className="flex justify-between items-center border-b pb-4 mb-6">
-                  <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                      <School className="w-5 h-5 text-indigo-600"/> Identitas Sekolah & Aplikasi
-                  </h3>
-                  <button onClick={handleSaveConfig} disabled={savingConfig} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:bg-indigo-700 flex items-center gap-2">
-                      {savingConfig ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>} Simpan
-                  </button>
+  const renderStudents = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          {/* Top Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-200">
+                  <div className="flex items-center gap-3 mb-2 opacity-80"><GraduationCap className="w-5 h-5"/> Total Siswa</div>
+                  <div className="text-4xl font-black">{students.length}</div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-center justify-between">
                   <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nama Aplikasi</label>
-                      <input 
-                        value={appConfig.appName} 
-                        onChange={(e) => setAppConfig({...appConfig, appName: e.target.value})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
+                      <div className="text-xs font-bold text-slate-400 uppercase">Aktif</div>
+                      <div className="text-2xl font-black text-slate-800">{students.filter(s => s.status === 'Active').length}</div>
                   </div>
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold"><CheckCircle className="w-5 h-5"/></div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-center justify-between">
                   <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nama Sekolah</label>
-                      <input 
-                        value={appConfig.schoolName} 
-                        onChange={(e) => setAppConfig({...appConfig, schoolName: e.target.value})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
+                      <div className="text-xs font-bold text-slate-400 uppercase">Kelas</div>
+                      <div className="text-2xl font-black text-slate-800">{[...new Set(students.map(s => s.class_name))].length}</div>
                   </div>
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nama Kepala Sekolah</label>
-                      <input 
-                        value={appConfig.principalName} 
-                        onChange={(e) => setAppConfig({...appConfig, principalName: e.target.value})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
-                  </div>
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">NIP Kepala Sekolah</label>
-                      <input 
-                        value={appConfig.principalNip} 
-                        onChange={(e) => setAppConfig({...appConfig, principalNip: e.target.value})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
-                  </div>
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold"><School className="w-5 h-5"/></div>
               </div>
           </div>
 
-          {/* Pengumuman & Preview */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="font-bold text-lg text-gray-800 border-b pb-4 mb-6 flex items-center gap-2">
-                  <Megaphone className="w-5 h-5 text-indigo-600"/> Pengumuman & Notifikasi
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                      <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Judul Pengumuman</label>
-                          <input 
-                            value={appConfig.announcementTitle} 
-                            onChange={(e) => setAppConfig({...appConfig, announcementTitle: e.target.value})}
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="Kosongkan jika tidak ada pengumuman"
-                          />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tanggal Kegiatan</label>
-                              <input 
-                                type="date"
-                                value={appConfig.announcementDate} 
-                                onChange={(e) => setAppConfig({...appConfig, announcementDate: e.target.value})}
-                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jenis Kegiatan</label>
-                              <input 
-                                value={appConfig.announcementType} 
-                                onChange={(e) => setAppConfig({...appConfig, announcementType: e.target.value})}
-                                placeholder="Akademik / Libur / dll"
-                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                              />
-                          </div>
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Waktu Pelaksanaan</label>
-                          <input 
-                            value={appConfig.announcementTime} 
-                            onChange={(e) => setAppConfig({...appConfig, announcementTime: e.target.value})}
-                            placeholder="08:00 - Selesai"
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Keterangan Lengkap</label>
-                          <textarea 
-                            value={appConfig.announcementDesc} 
-                            onChange={(e) => setAppConfig({...appConfig, announcementDesc: e.target.value})}
-                            rows={3}
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none resize-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tema Warna</label>
-                          <div className="flex gap-3">
-                              {['yellow', 'blue', 'green', 'pink', 'purple'].map(color => (
-                                  <button 
-                                    key={color}
-                                    onClick={() => setAppConfig({...appConfig, announcementColor: color as any})}
-                                    className={`w-8 h-8 rounded-full border-2 transition-all ${appConfig.announcementColor === color ? 'border-gray-600 scale-110' : 'border-transparent'}`}
-                                    style={{ backgroundColor: color === 'yellow' ? '#f59e0b' : color === 'blue' ? '#3b82f6' : color === 'green' ? '#10b981' : color === 'pink' ? '#ec4899' : '#8b5cf6' }}
-                                  />
-                              ))}
-                          </div>
-                      </div>
-                      <button onClick={handleSaveConfig} disabled={savingConfig} className="w-full bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold shadow hover:bg-indigo-700 flex items-center justify-center gap-2 mt-2">
-                          {savingConfig ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Simpan Pengumuman
-                      </button>
-                  </div>
-                  
-                  {/* Live Preview - UPDATED DESIGN */}
-                  <div className="bg-gray-100 rounded-3xl p-6 flex flex-col justify-center">
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-4 text-center">Live Preview (Tampilan Siswa)</label>
-                      
-                      <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-gray-100 relative overflow-hidden transform scale-95 origin-center">
-                          <div className="flex items-center gap-3 mb-6 relative z-10">
-                              <div className={`p-2 rounded-xl ${previewTheme.iconBg} ${previewTheme.iconText}`}><Megaphone className="w-6 h-6"/></div>
-                              <h3 className="font-black text-gray-800 text-lg leading-tight">Pengumuman Sekolah</h3>
-                          </div>
-                          
-                          {appConfig.announcementTitle ? (
-                              <div className="relative z-10">
-                                  <div className="flex gap-4 items-start">
-                                      {/* Date Block */}
-                                      <div className={`flex flex-col items-center justify-center w-16 h-16 rounded-2xl ${previewTheme.bg} ${previewTheme.text} shrink-0 border-2 ${previewTheme.border}`}>
-                                          <span className="text-2xl font-black leading-none">{dateDisplay.day}</span>
-                                          <span className="text-[10px] font-bold uppercase tracking-wider">{dateDisplay.month}</span>
-                                      </div>
-                                      
-                                      {/* Content */}
-                                      <div className="pt-1 flex-1">
-                                          <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${previewTheme.text} bg-white/50 inline-block px-2 py-0.5 rounded-md`}>
-                                              {appConfig.announcementType || 'Info'}
-                                          </div>
-                                          <h4 className="font-bold text-gray-800 text-sm mb-1 leading-snug">{appConfig.announcementTitle}</h4>
-                                          <div className="flex items-center gap-1 text-xs text-gray-400 font-medium mb-2">
-                                              <Clock className="w-3.5 h-3.5"/>
-                                              <span>{appConfig.announcementTime || 'Waktu tidak ditentukan'}</span>
-                                          </div>
-                                          <p className="text-xs text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                              {appConfig.announcementDesc || 'Deskripsi pengumuman...'}
-                                          </p>
-                                      </div>
-                                  </div>
-                              </div>
-                          ) : (
-                              // PREVIEW EMPTY STATE
-                              <div className="text-center py-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                  <BellOff className="w-10 h-10 text-gray-300 mx-auto mb-2"/>
-                                  <p className="text-xs font-bold text-gray-400">Belum ada pengumuman aktif.</p>
-                                  <p className="text-[10px] text-gray-400 mt-1">Silahkan cek kembali nanti.</p>
-                              </div>
-                          )}
-
-                          {/* Decor Blob */}
-                          {appConfig.announcementTitle && (
-                              <div className={`absolute -right-10 -bottom-10 w-40 h-40 rounded-full opacity-10 ${previewTheme.accent}`}></div>
-                          )}
-                      </div>
-                  </div>
+          {/* Controls */}
+          <div className="flex justify-between items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+              <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/>
+                  <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Cari nama atau NISN..."/>
+              </div>
+              <div className="flex gap-2">
+                  <button onClick={() => downloadTemplate('student')} className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl border border-slate-200"><Download className="w-5 h-5"/></button>
+                  <button onClick={() => handleImportClick('student')} className="p-2 text-green-600 hover:bg-green-50 rounded-xl border border-green-200 bg-green-50"><Upload className="w-5 h-5"/></button>
+                  <button onClick={() => handleAddClick('student')} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center gap-2"><Plus className="w-5 h-5"/> Baru</button>
               </div>
           </div>
-      </div>
-      );
-  };
 
-  const renderTable = (headers: string[], data: any[], type: 'student' | 'teacher' | 'schedule') => (
-      <div className="space-y-4 animate-fade-in-up">
-          {/* Action Bar */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-             <div className="text-sm text-gray-500 font-medium flex items-center gap-2">
-                Menampilkan {data.length} data
-             </div>
-             
-             {/* Search and Add */}
-             <div className="flex gap-2 w-full md:w-auto items-center">
-                 <div className="relative flex-1 md:flex-initial">
-                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                     <input 
-                        type="text" 
-                        placeholder="Cari..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                     />
-                 </div>
-                 <button 
-                    onClick={() => handleAddClick(type)}
-                    className="p-2 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition-colors"
-                    title="Tambah Manual"
-                 >
-                     <Plus className="w-4 h-4"/>
-                 </button>
-             </div>
-
-             <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-                <button onClick={() => downloadTemplate(type)} className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 border border-gray-200 whitespace-nowrap"><FileText className="w-4 h-4"/> Template</button>
-                <button onClick={() => handleImportClick(type)} className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 shadow-md whitespace-nowrap"><Upload className="w-4 h-4"/> Import CSV</button>
-                <button onClick={() => exportToCSV(data, type)} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-md whitespace-nowrap"><Download className="w-4 h-4"/> Export</button>
-             </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto max-h-[600px]">
-                  <table className="w-full text-sm text-left relative">
-                      <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 sticky top-0 z-10">
+          {/* Table */}
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xs">
                           <tr>
-                              {headers.map((h, i) => <th key={i} className="px-6 py-4 whitespace-nowrap">{h}</th>)}
+                              <th className="px-6 py-4">Siswa</th>
+                              <th className="px-6 py-4">NISN/NIS</th>
+                              <th className="px-6 py-4">Kelas</th>
+                              <th className="px-6 py-4">Orang Tua</th>
                               <th className="px-6 py-4 text-right">Aksi</th>
                           </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
-                          {data.length === 0 ? (
-                              <tr><td colSpan={headers.length + 1} className="p-12 text-center text-gray-400">Data Kosong</td></tr>
-                          ) : data.map((item, idx) => (
-                              <tr key={item.id} className="hover:bg-gray-50/50">
-                                  {type === 'student' && (
-                                    <>
-                                        <td className="px-6 py-4 text-gray-500">{idx + 1}</td>
-                                        <td className="px-6 py-4 font-bold">{item.name}</td>
-                                        <td className="px-6 py-4">{item.nis || '-'}</td>
-                                        <td className="px-6 py-4">{item.nisn}</td>
-                                        <td className="px-6 py-4">{item.tempat_lahir}, {item.tanggal_lahir}</td>
-                                        <td className="px-6 py-4">{item.nama_ayah} / {item.nama_ibu}</td>
-                                        <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold">{item.class_name}</span></td>
-                                    </>
-                                  )}
-                                  {type === 'teacher' && (
-                                    <>
-                                        <td className="px-6 py-4 font-bold">{item.name}</td>
-                                        <td className="px-6 py-4">{item.nip}</td>
-                                        <td className="px-6 py-4">{item.jenis_kelamin}</td>
-                                        <td className="px-6 py-4">{item.jenis_guru}</td>
-                                        <td className="px-6 py-4">{item.wali_kelas}</td>
-                                        <td className="px-6 py-4">{item.subject}</td>
-                                        <td className="px-6 py-4"><span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">{item.status}</span></td>
-                                    </>
-                                  )}
-                                  {type === 'schedule' && (
-                                    <>
-                                        <td className="px-6 py-4 font-bold">{item.day}</td>
-                                        <td className="px-6 py-4">{item.time}</td>
-                                        <td className="px-6 py-4">{item.class_name}</td>
-                                        <td className="px-6 py-4">{item.subject}</td>
-                                        <td className="px-6 py-4">{item.teacher_name}</td>
-                                    </>
-                                  )}
-                                  <td className="px-6 py-4 text-right">
-                                      <div className="flex justify-end gap-2">
-                                          <button onClick={() => handleEditClick(item, type)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit className="w-4 h-4"/></button>
-                                          <button onClick={() => handleDelete(item.id, type)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                      <tbody className="divide-y divide-slate-100">
+                          {students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.nisn.includes(searchTerm)).map((s, i) => (
+                              <tr key={s.id} className="hover:bg-slate-50 group transition-colors">
+                                  <td className="px-6 py-4 flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">{s.name.substring(0,2).toUpperCase()}</div>
+                                      <div>
+                                          <div className="font-bold text-slate-800">{s.name}</div>
+                                          <div className="text-xs text-slate-400">{s.tempat_lahir}, {s.tanggal_lahir}</div>
                                       </div>
+                                  </td>
+                                  <td className="px-6 py-4 font-mono text-slate-600">{s.nisn} <span className="text-slate-300">/</span> {s.nis || '-'}</td>
+                                  <td className="px-6 py-4"><span className="px-2 py-1 rounded bg-blue-50 text-blue-600 font-bold text-xs">{s.class_name}</span></td>
+                                  <td className="px-6 py-4 text-slate-600">{s.nama_ayah}</td>
+                                  <td className="px-6 py-4 text-right flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => handleEditClick(s, 'student')} className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg"><Edit className="w-4 h-4"/></button>
+                                      <button onClick={() => handleDelete(s.id, 'student')} className="p-2 text-red-600 hover:bg-red-100 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                                   </td>
                               </tr>
                           ))}
@@ -1112,30 +991,161 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       </div>
   );
 
+  const renderTeachers = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          {/* Header Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-lg shadow-teal-200">
+                  <div className="flex items-center gap-3 mb-2 opacity-80"><Users className="w-5 h-5"/> Total Guru</div>
+                  <div className="text-4xl font-black">{teachers.length}</div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-center justify-between">
+                  <div>
+                      <div className="text-xs font-bold text-slate-400 uppercase">Wali Kelas</div>
+                      <div className="text-2xl font-black text-slate-800">{teachers.filter(t => t.wali_kelas !== '-' && t.wali_kelas).length}</div>
+                  </div>
+                  <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold"><BookOpen className="w-5 h-5"/></div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-center justify-between">
+                  <div>
+                      <div className="text-xs font-bold text-slate-400 uppercase">Guru Mapel</div>
+                      <div className="text-2xl font-black text-slate-800">{teachers.filter(t => t.jenis_guru === 'Guru Mapel').length}</div>
+                  </div>
+                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold"><Layers className="w-5 h-5"/></div>
+              </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex justify-between items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+              <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/>
+                  <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 transition-all" placeholder="Cari nama guru atau NIP..."/>
+              </div>
+              <div className="flex gap-2">
+                  <button onClick={() => downloadTemplate('teacher')} className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl border border-slate-200"><Download className="w-5 h-5"/></button>
+                  <button onClick={() => handleImportClick('teacher')} className="p-2 text-green-600 hover:bg-green-50 rounded-xl border border-green-200 bg-green-50"><Upload className="w-5 h-5"/></button>
+                  <button onClick={() => handleAddClick('teacher')} className="px-4 py-2 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 shadow-lg shadow-teal-200 flex items-center gap-2"><Plus className="w-5 h-5"/> Tambah</button>
+              </div>
+          </div>
+
+          {/* Cards Grid for Teachers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((t) => (
+                  <div key={t.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
+                      <div className={`absolute top-0 left-0 w-1.5 h-full ${t.status === 'Active' ? 'bg-teal-500' : 'bg-slate-300'}`}></div>
+                      <div className="flex justify-between items-start mb-4 pl-2">
+                          <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-2xl">
+                              {t.jenis_kelamin === 'P' ? '👩‍🏫' : '👨‍🏫'}
+                          </div>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEditClick(t, 'teacher')} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"><Edit className="w-4 h-4"/></button>
+                              <button onClick={() => handleDelete(t.id, 'teacher')} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100"><Trash2 className="w-4 h-4"/></button>
+                          </div>
+                      </div>
+                      <div className="pl-2">
+                          <h4 className="font-bold text-slate-800 text-lg mb-1 leading-tight">{t.name}</h4>
+                          <div className="text-xs font-mono text-slate-400 mb-3 bg-slate-50 inline-block px-2 py-1 rounded">NIP. {t.nip}</div>
+                          <div className="flex flex-wrap gap-2">
+                              {t.wali_kelas && t.wali_kelas !== '-' && <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg">Wali Kelas {t.wali_kelas}</span>}
+                              <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">{t.jenis_guru}</span>
+                          </div>
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </div>
+  );
+
+  const renderSchedule = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="flex flex-col md:flex-row justify-between items-end gap-4 bg-gradient-to-r from-violet-600 to-indigo-600 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+              <div className="relative z-10">
+                  <h2 className="text-2xl font-black mb-2">Jadwal Pelajaran</h2>
+                  <p className="text-indigo-100 opacity-90 max-w-lg">Atur jadwal KBM mingguan untuk seluruh kelas dan guru dengan mudah.</p>
+              </div>
+              <div className="flex gap-2 relative z-10">
+                  <button onClick={() => downloadTemplate('schedule')} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl border border-white/20 backdrop-blur-sm text-sm font-bold flex items-center gap-2"><Download className="w-4 h-4"/> Template</button>
+                  <button onClick={() => handleImportClick('schedule')} className="px-4 py-2 bg-white text-indigo-600 rounded-xl shadow-lg hover:bg-indigo-50 text-sm font-bold flex items-center gap-2"><Upload className="w-4 h-4"/> Import CSV</button>
+                  <button onClick={() => handleAddClick('schedule')} className="px-4 py-2 bg-emerald-400 text-emerald-900 rounded-xl shadow-lg hover:bg-emerald-300 text-sm font-bold flex items-center gap-2"><Plus className="w-4 h-4"/> Tambah Manual</button>
+              </div>
+              {/* Decor */}
+              <CalendarRange className="absolute -right-6 -bottom-6 w-40 h-40 text-white opacity-10 rotate-12"/>
+          </div>
+
+          {/* Daily Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => {
+                  const daySchedules = schedules.filter(s => s.day === day).sort((a,b) => {
+                      const getJam = (t: string) => parseInt(t.replace(/\D/g,'')) || 0;
+                      return getJam(a.time) - getJam(b.time);
+                  });
+                  
+                  return (
+                      <div key={day} className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col h-full">
+                          <div className={`p-4 font-black text-center text-white ${day === 'Senin' ? 'bg-violet-500' : 'bg-slate-400'}`}>
+                              {day.toUpperCase()}
+                          </div>
+                          <div className="p-4 space-y-3 flex-1 bg-slate-50/50">
+                              {daySchedules.length === 0 ? (
+                                  <div className="text-center py-8 text-slate-300 text-sm italic">Belum ada jadwal</div>
+                              ) : (
+                                  daySchedules.map((sch) => (
+                                      <div key={sch.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group relative">
+                                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                              <button onClick={() => handleEditClick(sch, 'schedule')} className="p-1 bg-slate-100 rounded hover:bg-blue-100 text-blue-600"><Edit className="w-3 h-3"/></button>
+                                              <button onClick={() => handleDelete(sch.id, 'schedule')} className="p-1 bg-slate-100 rounded hover:bg-red-100 text-red-600"><Trash2 className="w-3 h-3"/></button>
+                                          </div>
+                                          <div className="flex items-center gap-3">
+                                              <div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 font-bold text-xs flex items-center justify-center text-center leading-tight px-1 border border-violet-100">
+                                                  {sch.time.replace('Jam Ke-','Jam ')}
+                                              </div>
+                                              <div>
+                                                  <div className="font-bold text-slate-800 text-sm">{sch.subject}</div>
+                                                  <div className="text-xs text-slate-500 flex items-center gap-2">
+                                                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold">{sch.class_name}</span>
+                                                      <span className="truncate max-w-[100px]">{sch.teacher_name}</span>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  ))
+                              )}
+                          </div>
+                      </div>
+                  );
+              })}
+          </div>
+      </div>
+  );
+
   const renderGradesRecap = () => (
       <div className="space-y-6 animate-fade-in-up">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
+                  <div className="flex items-center gap-2">
+                      <div className="bg-orange-100 p-2 rounded-xl text-orange-600"><FileSpreadsheet className="w-6 h-6"/></div>
+                      <h3 className="font-bold text-lg text-slate-800">Rekapitulasi Nilai</h3>
+                  </div>
                   <div className="flex gap-4">
                       <select 
                           value={gradeFilterClass} 
                           onChange={(e) => setGradeFilterClass(e.target.value)}
-                          className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          className="px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-orange-500 outline-none font-bold text-slate-700"
                       >
                           {['1A', '1B', '2A', '2B', '3A', '4A', '5A', '6A'].map(c => <option key={c} value={c}>Kelas {c}</option>)}
                       </select>
                       <select 
                           value={gradeFilterSubject} 
                           onChange={(e) => setGradeFilterSubject(e.target.value)}
-                          className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          className="px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-orange-500 outline-none font-bold text-slate-700"
                       >
                           {STANDARD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                   </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
                   <table className="w-full text-sm text-left border-collapse">
-                      <thead className="bg-gray-50 text-gray-500 font-medium">
+                      <thead className="bg-slate-50 text-slate-500 font-medium">
                           <tr>
                               <th className="px-6 py-4 border-b">Nama Siswa</th>
                               {/* Dynamic PH Headers */}
@@ -1143,36 +1153,34 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                                   <th key={i} className="px-4 py-4 text-center border-b w-16">PH{i + 1}</th>
                               ))}
                               <th className="px-2 py-4 border-b w-12 text-center">
-                                  <button onClick={() => setPhCount(p => Math.min(p + 1, 8))} className="text-indigo-600 hover:text-indigo-800 bg-indigo-50 p-1 rounded"><Plus className="w-3 h-3"/></button>
+                                  <button onClick={() => setPhCount(p => Math.min(p + 1, 8))} className="text-orange-600 hover:text-orange-800 bg-orange-50 p-1 rounded transition-colors"><Plus className="w-3 h-3"/></button>
                               </th>
                               <th className="px-6 py-4 text-center border-b border-l">PTS</th>
                               <th className="px-6 py-4 text-center border-b">PAS</th>
-                              <th className="px-6 py-4 text-center border-b bg-gray-100 font-bold">NA</th>
+                              <th className="px-6 py-4 text-center border-b bg-orange-50 font-bold text-orange-700">NA</th>
                           </tr>
                       </thead>
                       <tbody>
                           {grades.filter(g => g.class_name === gradeFilterClass && g.subject === gradeFilterSubject).length === 0 ? (
-                              <tr><td colSpan={phCount + 5} className="p-8 text-center text-gray-400">Belum ada data nilai untuk filter ini.</td></tr>
+                              <tr><td colSpan={phCount + 5} className="p-12 text-center text-slate-400 italic">Belum ada data nilai untuk filter ini.</td></tr>
                           ) : (
                               grades.filter(g => g.class_name === gradeFilterClass && g.subject === gradeFilterSubject).map(g => {
-                                  // Mock PH splitting since DB only has 1 array column in types but logic here supports multiple
-                                  // We will just replicate the score or show 0 if not present in expanded view
+                                  // Mock PH splitting
                                   const phVal = Array.isArray(g.ph_scores) ? g.ph_scores[0] : 0; 
                                   const na = Math.round(((phVal || 0) + (g.pts || 0) + (g.pas || 0)) / 3);
                                   
                                   return (
-                                  <tr key={g.id} className="border-b last:border-0 hover:bg-gray-50">
-                                      <td className="px-6 py-3 font-bold text-gray-700">{g.student_name}</td>
+                                  <tr key={g.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                                      <td className="px-6 py-3 font-bold text-slate-700">{g.student_name}</td>
                                       {Array.from({ length: phCount }).map((_, i) => (
-                                          <td key={i} className="px-4 py-3 text-center text-gray-600">
-                                              {/* In a real dynamic system, g.ph_scores would be an array. Using first value for demo. */}
+                                          <td key={i} className="px-4 py-3 text-center text-slate-600">
                                               {i === 0 ? (Array.isArray(g.ph_scores) ? g.ph_scores[0] : '-') : '-'}
                                           </td>
                                       ))}
                                       <td className="px-2 py-3 text-center"></td>
-                                      <td className="px-6 py-3 text-center border-l">{g.pts}</td>
+                                      <td className="px-6 py-3 text-center border-l border-slate-100">{g.pts}</td>
                                       <td className="px-6 py-3 text-center">{g.pas}</td>
-                                      <td className="px-6 py-3 text-center font-bold text-indigo-700 bg-gray-50">
+                                      <td className="px-6 py-3 text-center font-bold text-orange-700 bg-orange-50/50">
                                           {na}
                                       </td>
                                   </tr>
@@ -1181,7 +1189,7 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
                           )}
                       </tbody>
                   </table>
-                  <div className="mt-4 flex justify-end">
+                  <div className="p-4 border-t border-slate-100 flex justify-end">
                       {phCount > 1 && (
                           <button onClick={() => setPhCount(p => Math.max(p - 1, 1))} className="text-xs text-red-500 hover:underline flex items-center gap-1">
                               <MinusCircle className="w-3 h-3"/> Kurangi Kolom PH
@@ -1193,517 +1201,778 @@ const AdminDashboard: React.FC<AdminProps> = ({ onLogout }) => {
       </div>
   );
 
+  const renderAppConfig = () => {
+    const previewTheme = getPreviewTheme(appConfig.announcementColor);
+    const date = new Date(appConfig.announcementDate);
+    const dateDisplay = isNaN(date.getTime()) ? { day: '--', month: '---' } : {
+        day: date.getDate(),
+        month: date.toLocaleDateString('id-ID', { month: 'short' }).toUpperCase()
+    };
+
+    return (
+        <div className="space-y-8 animate-fade-in-up pb-20">
+            {/* Header Section */}
+            <div className="bg-gradient-to-r from-indigo-600 to-blue-500 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                <div className="relative z-10 flex justify-between items-end">
+                    <div>
+                        <h2 className="text-3xl font-black mb-2">Identitas & Konfigurasi</h2>
+                        <p className="text-blue-100 max-w-xl">Atur informasi sekolah, logo, dan pengumuman yang tampil di halaman publik secara realtime.</p>
+                    </div>
+                    <button onClick={handleSaveConfig} disabled={savingConfig} className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-50 transition-colors flex items-center gap-2">
+                        {savingConfig ? <RefreshCw className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} Simpan Perubahan
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Left Column: Forms */}
+                <div className="lg:col-span-7 space-y-8">
+                    {/* School Identity */}
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <h3 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
+                            <School className="w-5 h-5 text-indigo-500"/> Profil Sekolah
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Nama Aplikasi</label>
+                                <input value={appConfig.appName} onChange={(e) => setAppConfig({...appConfig, appName: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Nama Sekolah</label>
+                                <input value={appConfig.schoolName} onChange={(e) => setAppConfig({...appConfig, schoolName: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Kepala Sekolah</label>
+                                <input value={appConfig.principalName} onChange={(e) => setAppConfig({...appConfig, principalName: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase">NIP KS</label>
+                                <input value={appConfig.principalNip} onChange={(e) => setAppConfig({...appConfig, principalNip: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"/>
+                            </div>
+                            
+                            <div className="space-y-1 col-span-full">
+                                <label className="text-xs font-bold text-slate-400 uppercase">URL Logo (Utama)</label>
+                                <input value={appConfig.logoUrl1x1} onChange={(e) => setAppConfig({...appConfig, logoUrl1x1: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"/>
+                            </div>
+                            <div className="space-y-1 col-span-full">
+                                <label className="text-xs font-bold text-slate-400 uppercase">URL Kop Surat (Laporan)</label>
+                                <input value={appConfig.letterHeadUrl} onChange={(e) => setAppConfig({...appConfig, letterHeadUrl: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Announcement Form */}
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <h3 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
+                            <Megaphone className="w-5 h-5 text-orange-500"/> Edit Pengumuman
+                        </h3>
+                        <div className="space-y-5">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Judul Pengumuman</label>
+                                <input value={appConfig.announcementTitle} onChange={(e) => setAppConfig({...appConfig, announcementTitle: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500" placeholder="Contoh: Libur Awal Puasa"/>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-5">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Tanggal</label>
+                                    <input type="date" value={appConfig.announcementDate} onChange={(e) => setAppConfig({...appConfig, announcementDate: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500"/>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Waktu / Jam</label>
+                                    <input value={appConfig.announcementTime} onChange={(e) => setAppConfig({...appConfig, announcementTime: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500"/>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Isi Pengumuman</label>
+                                <textarea value={appConfig.announcementDesc} onChange={(e) => setAppConfig({...appConfig, announcementDesc: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-orange-500" rows={4} placeholder="Deskripsi lengkap pengumuman..."/>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Tema Warna Widget</label>
+                                <div className="flex gap-3">
+                                    {['yellow', 'blue', 'green', 'pink', 'purple'].map(c => (
+                                        <button 
+                                            key={c}
+                                            onClick={() => setAppConfig({...appConfig, announcementColor: c as any})}
+                                            className={`w-10 h-10 rounded-full border-2 transition-all transform hover:scale-110 ${appConfig.announcementColor === c ? 'border-slate-600 scale-110 ring-2 ring-offset-2 ring-slate-200' : 'border-transparent'}`}
+                                            style={{ backgroundColor: c === 'yellow' ? '#f59e0b' : c === 'blue' ? '#3b82f6' : c === 'green' ? '#10b981' : c === 'pink' ? '#ec4899' : '#8b5cf6' }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column: Preview */}
+                <div className="lg:col-span-5">
+                    <div className="sticky top-8">
+                        <div className="bg-slate-800 rounded-[2.5rem] p-4 shadow-2xl border-4 border-slate-700">
+                            <div className="bg-slate-100 rounded-[2rem] overflow-hidden min-h-[500px] relative">
+                                {/* Fake Mobile Header */}
+                                <div className="h-8 bg-slate-200 w-full flex justify-center items-center gap-2 mb-4">
+                                    <div className="w-16 h-4 bg-slate-300 rounded-full"></div>
+                                </div>
+                                
+                                {/* Preview Content */}
+                                <div className="p-4 space-y-4">
+                                    <div className="text-center mb-6">
+                                        <h4 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Live Preview</h4>
+                                        <p className="text-[10px] text-slate-400">Tampilan di HP Siswa/Wali Murid</p>
+                                    </div>
+
+                                    {/* The Widget */}
+                                    <div className="bg-white rounded-3xl p-5 shadow-lg border border-slate-100 relative overflow-hidden">
+                                        <div className="flex items-center gap-3 mb-4 relative z-10">
+                                            <div className={`p-2 rounded-xl ${previewTheme.iconBg} ${previewTheme.iconText}`}><Megaphone className="w-5 h-5"/></div>
+                                            <h3 className="font-black text-gray-800 text-sm leading-tight">Pengumuman Sekolah</h3>
+                                        </div>
+                                        
+                                        {appConfig.announcementTitle ? (
+                                            <div className="relative z-10">
+                                                <div className="flex gap-3 items-start">
+                                                    <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl ${previewTheme.bg} ${previewTheme.text} shrink-0 border-2 ${previewTheme.border}`}>
+                                                        <span className="text-lg font-black leading-none">{dateDisplay.day}</span>
+                                                        <span className="text-[8px] font-bold uppercase tracking-wider">{dateDisplay.month}</span>
+                                                    </div>
+                                                    <div className="pt-0.5 flex-1">
+                                                        <div className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${previewTheme.text} bg-slate-50 inline-block px-1.5 py-0.5 rounded-md`}>
+                                                            {appConfig.announcementType || 'Info'}
+                                                        </div>
+                                                        <h4 className="font-bold text-gray-800 text-xs mb-1 leading-snug">{appConfig.announcementTitle}</h4>
+                                                        <div className="flex items-center gap-1 text-[10px] text-gray-400 font-medium mb-2">
+                                                            <Clock className="w-3 h-3"/>
+                                                            <span>{appConfig.announcementTime || '-'}</span>
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-600 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                            {appConfig.announcementDesc || '...'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-6 text-gray-300 text-xs italic">Tidak ada pengumuman aktif</div>
+                                        )}
+                                        {/* Decor */}
+                                        <div className={`absolute -right-8 -bottom-8 w-24 h-24 rounded-full opacity-10 ${previewTheme.accent}`}></div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
   const renderFinance = () => (
       <div className="space-y-6 animate-fade-in-up">
-          {/* Navigation Tabs */}
-          <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-fit">
-              <button onClick={() => setFinanceTab('overview')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${financeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Ringkasan</button>
-              <button onClick={() => setFinanceTab('input')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${financeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Input Transaksi</button>
-              <button onClick={() => setFinanceTab('settings')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${financeTab === 'settings' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Atur Harga</button>
-          </div>
-
-          {financeTab === 'overview' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Recent Transactions */}
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 col-span-2">
-                      <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Wallet className="w-5 h-5 text-orange-600"/> Riwayat Transaksi Terakhir</h3>
-                      <div className="overflow-x-auto">
-                          <table className="w-full text-sm text-left">
-                              <thead className="bg-gray-50 text-gray-500 font-medium">
-                                  <tr>
-                                      <th className="p-3">Tanggal</th>
-                                      <th className="p-3">Siswa</th>
-                                      <th className="p-3">Jenis</th>
-                                      <th className="p-3 text-right">Berat/Jml</th>
-                                      <th className="p-3 text-right">Nominal</th>
-                                  </tr>
-                              </thead>
-                              <tbody>
-                                  {wasteTransactions.length === 0 ? <tr className="text-gray-400 text-center"><td colSpan={5} className="p-4">Belum ada transaksi.</td></tr> : 
-                                    wasteTransactions.slice(0, 10).map((t) => (
-                                      <tr key={t.id} className="border-b last:border-0 hover:bg-gray-50">
-                                          <td className="p-3 text-gray-500">{t.date}</td>
-                                          <td className="p-3 font-bold">{t.student_name}</td>
-                                          <td className="p-3">
-                                              <span className={`px-2 py-1 rounded text-xs font-bold ${t.status === 'Deposit' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                  {t.status === 'Deposit' ? 'Setor' : 'Tarik'}
-                                              </span>
-                                              <span className="ml-2 text-gray-600 text-xs">{t.type}</span>
-                                          </td>
-                                          <td className="p-3 text-right font-mono">{t.weight > 0 ? `${t.weight} kg` : '-'}</td>
-                                          <td className={`p-3 text-right font-bold ${t.status === 'Deposit' ? 'text-green-600' : 'text-red-600'}`}>
-                                              {t.status === 'Deposit' ? '+' : '-'} {t.amount.toLocaleString('id-ID')}
-                                          </td>
-                                      </tr>
-                                  ))}
-                              </tbody>
-                          </table>
+          {/* Top Wallet Summary */}
+          <div className="bg-gradient-to-r from-emerald-600 to-green-500 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div>
+                      <p className="text-emerald-100 font-bold uppercase text-xs mb-1">Total Saldo Bank Sampah</p>
+                      <h2 className="text-4xl font-black">Rp {wasteTransactions.reduce((acc, curr) => curr.status === 'Deposit' ? acc + curr.amount : acc - curr.amount, 0).toLocaleString()}</h2>
+                  </div>
+                  <div className="flex items-center gap-3">
+                      <div className="p-3 bg-white/20 rounded-2xl"><ArrowUpRight className="w-6 h-6"/></div>
+                      <div>
+                          <p className="text-emerald-100 font-bold uppercase text-xs">Pemasukan</p>
+                          <p className="text-xl font-bold">Rp {wasteTransactions.filter(t => t.status === 'Deposit').reduce((acc, t) => acc + t.amount, 0).toLocaleString()}</p>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                      <div className="p-3 bg-white/20 rounded-2xl"><ArrowUpRight className="w-6 h-6 rotate-180"/></div>
+                      <div>
+                          <p className="text-emerald-100 font-bold uppercase text-xs">Penarikan</p>
+                          <p className="text-xl font-bold">Rp {wasteTransactions.filter(t => t.status !== 'Deposit').reduce((acc, t) => acc + t.amount, 0).toLocaleString()}</p>
                       </div>
                   </div>
               </div>
-          )}
+              <Recycle className="absolute -right-10 -bottom-10 w-64 h-64 text-emerald-900 opacity-10 rotate-12"/>
+          </div>
 
-          {financeTab === 'input' && (
-              <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
-                  <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center gap-2"><PlusCircle className="w-6 h-6 text-green-600"/> Input Transaksi Baru</h3>
-                  <form onSubmit={handleFinanceSubmit} className="space-y-6">
-                      
-                      {/* Step 1: Select Student */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Input Form */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                  <h3 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-600"/> Input Transaksi</h3>
+                  <form onSubmit={handleFinanceSubmit} className="space-y-4">
                       <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Pilih Siswa</label>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Cari Siswa</label>
                           <select 
-                              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                               value={financeForm.studentId}
-                              onChange={(e) => setFinanceForm({...financeForm, studentId: e.target.value})}
+                              onChange={e => setFinanceForm({...financeForm, studentId: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                               required
                           >
-                              <option value="">-- Cari Siswa --</option>
-                              {students.map(s => (
-                                  <option key={s.id} value={s.id}>{s.class_name} - {s.name}</option>
-                              ))}
+                              <option value="">-- Pilih Siswa --</option>
+                              {students.map(s => <option key={s.id} value={s.id}>{s.name} - {s.class_name}</option>)}
                           </select>
                       </div>
 
-                      {/* Step 2: Transaction Type */}
-                      <div className="grid grid-cols-2 gap-4">
-                          <label className={`cursor-pointer p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${financeForm.transactionType === 'deposit' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:bg-gray-50 text-gray-500'}`}>
-                              <input type="radio" className="hidden" name="type" onClick={() => setFinanceForm({...financeForm, transactionType: 'deposit'})} />
-                              <TrendingUp className="w-6 h-6"/>
-                              <span className="font-bold">Setor Sampah</span>
-                          </label>
-                          <label className={`cursor-pointer p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${financeForm.transactionType === 'withdraw' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 hover:bg-gray-50 text-gray-500'}`}>
-                              <input type="radio" className="hidden" name="type" onClick={() => setFinanceForm({...financeForm, transactionType: 'withdraw'})} />
-                              <TrendingDown className="w-6 h-6"/>
-                              <span className="font-bold">Penarikan / Belanja</span>
-                          </label>
+                      <div className="flex bg-slate-100 p-1 rounded-xl">
+                          <button type="button" onClick={() => setFinanceForm({...financeForm, transactionType: 'deposit'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${financeForm.transactionType === 'deposit' ? 'bg-white shadow text-emerald-600' : 'text-slate-500'}`}>Setor</button>
+                          <button type="button" onClick={() => setFinanceForm({...financeForm, transactionType: 'withdraw'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${financeForm.transactionType === 'withdraw' ? 'bg-white shadow text-red-600' : 'text-slate-500'}`}>Tarik</button>
                       </div>
 
-                      {/* Step 3: Conditional Inputs */}
                       {financeForm.transactionType === 'deposit' ? (
-                          <div className="bg-green-50/50 p-6 rounded-2xl border border-green-100 space-y-4">
-                              <div>
-                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jenis Sampah</label>
-                                  <select 
-                                      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none"
-                                      value={financeForm.wasteTypeId}
-                                      onChange={(e) => setFinanceForm({...financeForm, wasteTypeId: parseInt(e.target.value)})}
-                                  >
-                                      {wasteTypes.map(w => (
-                                          <option key={w.id} value={w.id}>{w.name} (Rp {w.price_per_kg}/kg)</option>
-                                      ))}
-                                  </select>
-                              </div>
-                              <div>
-                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Berat (Kg)</label>
-                                  <input 
-                                      type="number" step="0.1"
-                                      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none font-bold text-lg"
-                                      placeholder="0.0"
-                                      value={financeForm.weight}
-                                      onChange={(e) => setFinanceForm({...financeForm, weight: e.target.value})}
-                                      required
-                                  />
-                              </div>
-                              <div className="flex justify-between items-center pt-2">
-                                  <span className="text-sm font-medium text-gray-500">Estimasi Pendapatan:</span>
-                                  <span className="text-xl font-black text-green-600">
-                                      Rp {(parseFloat(financeForm.weight || '0') * (wasteTypes.find(w=>w.id === Number(financeForm.wasteTypeId))?.price_per_kg || 0)).toLocaleString('id-ID')}
-                                  </span>
-                              </div>
-                          </div>
+                          <>
+                              <select 
+                                  value={financeForm.wasteTypeId}
+                                  onChange={e => setFinanceForm({...financeForm, wasteTypeId: parseInt(e.target.value)})}
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                              >
+                                  {wasteTypes.map(w => <option key={w.id} value={w.id}>{w.name} (Rp {w.price_per_kg}/kg)</option>)}
+                              </select>
+                              <input 
+                                  type="number" step="0.1"
+                                  value={financeForm.weight}
+                                  onChange={e => setFinanceForm({...financeForm, weight: e.target.value})}
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                  placeholder="Berat (Kg)"
+                                  required
+                              />
+                          </>
                       ) : (
-                          <div className="bg-red-50/50 p-6 rounded-2xl border border-red-100 space-y-4">
-                              <div>
-                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jenis Penarikan</label>
-                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                      {['Uang Tunai', 'Buku Tulis', 'Pensil', 'Penghapus', 'Penggaris', 'ATK Lain'].map(item => (
-                                          <div 
-                                            key={item} 
-                                            onClick={() => setFinanceForm({...financeForm, withdrawItem: item})}
-                                            className={`p-2 rounded-lg text-xs font-bold text-center cursor-pointer border ${financeForm.withdrawItem === item ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-red-50'}`}
-                                          >
-                                              {item}
-                                          </div>
-                                      ))}
-                                  </div>
-                              </div>
-                              <div>
-                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nominal / Harga (Rp)</label>
-                                  <input 
-                                      type="number"
-                                      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none font-bold text-lg text-red-600"
-                                      placeholder="0"
-                                      value={financeForm.withdrawAmount}
-                                      onChange={(e) => setFinanceForm({...financeForm, withdrawAmount: e.target.value})}
-                                      required
-                                  />
-                              </div>
-                          </div>
+                           <>
+                              <select 
+                                  value={financeForm.withdrawItem}
+                                  onChange={e => setFinanceForm({...financeForm, withdrawItem: e.target.value})}
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                              >
+                                  <option value="Uang Tunai">Uang Tunai</option>
+                                  <option value="Buku Tulis">Buku Tulis</option>
+                                  <option value="Pensil">Pensil</option>
+                              </select>
+                              <input 
+                                  type="number"
+                                  value={financeForm.withdrawAmount}
+                                  onChange={e => setFinanceForm({...financeForm, withdrawAmount: e.target.value})}
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                  placeholder="Nominal (Rp)"
+                                  required
+                              />
+                          </>
                       )}
 
-                      <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2">
-                          <Save className="w-5 h-5"/> Simpan Transaksi
+                      <button type="submit" className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-slate-800 transition-colors">
+                          Simpan Transaksi
                       </button>
                   </form>
               </div>
-          )}
 
-          {financeTab === 'settings' && (
-              <div className="max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                  <h3 className="font-bold text-lg text-gray-800 mb-6 flex items-center gap-2"><Settings className="w-5 h-5 text-gray-600"/> Pengaturan Harga Sampah</h3>
-                  <div className="space-y-4">
-                      {wasteTypes.map((w, idx) => (
-                          <div key={w.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                              <div className="flex-1">
-                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Jenis Sampah</label>
-                                  <input 
-                                      type="text" 
-                                      value={w.name}
-                                      onChange={(e) => {
-                                          const newTypes = [...wasteTypes];
-                                          newTypes[idx].name = e.target.value;
-                                          setWasteTypes(newTypes);
-                                      }}
-                                      className="w-full bg-transparent font-bold text-gray-800 outline-none"
-                                  />
+              {/* History Table */}
+              <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col">
+                  <h3 className="font-bold text-slate-800 text-lg mb-6">Riwayat Terbaru</h3>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 max-h-[400px]">
+                      {wasteTransactions.map((tx) => (
+                          <div key={tx.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl hover:bg-white hover:shadow-md transition-all border border-slate-100">
+                              <div className="flex items-center gap-4">
+                                  <div className={`p-3 rounded-full ${tx.status === 'Deposit' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                      {tx.status === 'Deposit' ? <TrendingUp className="w-5 h-5"/> : <TrendingDown className="w-5 h-5"/>}
+                                  </div>
+                                  <div>
+                                      <div className="font-bold text-slate-800">{tx.student_name}</div>
+                                      <div className="text-xs text-slate-500">{tx.date} • {tx.type}</div>
+                                  </div>
                               </div>
-                              <div className="w-32">
-                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Harga / Kg</label>
-                                  <input 
-                                      type="number" 
-                                      value={w.price_per_kg}
-                                      onChange={(e) => {
-                                          const newTypes = [...wasteTypes];
-                                          newTypes[idx].price_per_kg = parseInt(e.target.value);
-                                          setWasteTypes(newTypes);
-                                      }}
-                                      className="w-full bg-white p-2 rounded border border-gray-200 font-mono font-bold text-right outline-none focus:border-indigo-500"
-                                  />
+                              <div className={`font-mono font-bold ${tx.status === 'Deposit' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {tx.status === 'Deposit' ? '+' : '-'}Rp {tx.amount.toLocaleString()}
                               </div>
-                              <button onClick={() => setWasteTypes(wasteTypes.filter((_, i) => i !== idx))} className="p-2 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-5 h-5"/></button>
                           </div>
                       ))}
-                      <button 
-                        onClick={() => setWasteTypes([...wasteTypes, { id: Date.now(), name: 'Jenis Baru', price_per_kg: 0 }])}
-                        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-bold hover:bg-gray-50 flex items-center justify-center gap-2"
-                      >
-                          <Plus className="w-5 h-5"/> Tambah Jenis
-                      </button>
                   </div>
               </div>
-          )}
+          </div>
       </div>
   );
 
   const renderLetters = () => (
       <div className="space-y-6 animate-fade-in-up">
-           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Mail className="w-5 h-5 text-indigo-600"/> Permohonan Izin Masuk</h3>
-              <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                      <thead className="bg-gray-50 text-gray-500 font-medium">
-                          <tr>
-                              <th className="px-6 py-3">Tanggal</th>
-                              <th className="px-6 py-3">Siswa</th>
-                              <th className="px-6 py-3">Kelas</th>
-                              <th className="px-6 py-3">Jenis</th>
-                              <th className="px-6 py-3">Alasan</th>
-                              <th className="px-6 py-3 text-right">Status</th>
-                          </tr>
-                      </thead>
-                      <tbody>
-                          {permissions.length === 0 ? (
-                               <tr><td colSpan={6} className="p-8 text-center text-gray-400">Tidak ada data permohonan izin.</td></tr>
-                          ) : permissions.map((p) => (
-                              <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50">
-                                  <td className="px-6 py-4">{p.date}</td>
-                                  <td className="px-6 py-4 font-bold">{p.student_name}</td>
-                                  <td className="px-6 py-4">{p.class_name}</td>
-                                  <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${p.type === 'Sakit' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>{p.type}</span></td>
-                                  <td className="px-6 py-4 text-gray-600 max-w-xs truncate">{p.reason}</td>
-                                  <td className="px-6 py-4 text-right">
-                                      <span className={`px-2 py-1 rounded text-xs font-bold ${p.status === 'Approved' ? 'bg-green-100 text-green-600' : p.status === 'Rejected' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
-                                  </td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 min-h-[500px]">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                  <div className="p-2 bg-red-50 text-red-600 rounded-xl"><Mail className="w-6 h-6"/></div>
+                  <div>
+                      <h3 className="font-bold text-lg text-slate-800">Kotak Masuk Izin</h3>
+                      <p className="text-xs text-slate-400">Permohonan izin sakit/kepentingan keluarga siswa.</p>
+                  </div>
               </div>
-           </div>
+              
+              {permissions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-center">
+                      <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4"><CheckCircle className="w-10 h-10 text-slate-300"/></div>
+                      <p className="text-slate-500 font-bold">Tidak ada permohonan izin baru.</p>
+                      <p className="text-xs text-slate-400">Semua siswa masuk seperti biasa.</p>
+                  </div>
+              ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {permissions.map((p) => (
+                          <div key={p.id} className="p-5 rounded-2xl border border-slate-200 hover:border-red-200 hover:bg-red-50/30 transition-all group">
+                              <div className="flex justify-between items-start mb-3">
+                                  <div>
+                                      <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${p.type === 'Sakit' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>{p.type}</span>
+                                      <h4 className="font-bold text-slate-800 mt-2">{p.student_name}</h4>
+                                      <p className="text-xs text-slate-500">Kelas {p.class_name}</p>
+                                  </div>
+                                  <div className="text-right">
+                                      <div className="text-xs font-bold text-slate-400">{p.date}</div>
+                                  </div>
+                              </div>
+                              <p className="text-sm text-slate-600 italic mb-4 bg-white p-3 rounded-xl border border-slate-100">"{p.reason}"</p>
+                              <div className="flex gap-2">
+                                  <button className="flex-1 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">Tolak</button>
+                                  <button className="flex-1 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800">Setujui</button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
+          </div>
       </div>
   );
 
   const renderGoodDeeds = () => (
       <div className="space-y-6 animate-fade-in-up">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500"/> Laporan Anak Hebat</h3>
-              <div className="overflow-x-auto">
-                   <table className="w-full text-sm text-left">
-                       <thead className="bg-gray-50 text-gray-500 font-medium">
-                           <tr>
-                               <th className="px-6 py-3">Tanggal</th>
-                               <th className="px-6 py-3">Siswa</th>
-                               <th className="px-6 py-3">Aktivitas</th>
-                               <th className="px-6 py-3 text-right">Status</th>
-                           </tr>
-                       </thead>
-                       <tbody>
-                           {goodDeeds.length === 0 ? (
-                                <tr><td colSpan={4} className="p-8 text-center text-gray-400">Belum ada laporan aktivitas baik.</td></tr>
-                           ) : goodDeeds.map((g) => (
-                               <tr key={g.id} className="border-b last:border-0 hover:bg-gray-50">
-                                   <td className="px-6 py-4">{g.date} {g.time}</td>
-                                   <td className="px-6 py-4 font-bold">{g.student_name} <span className="text-xs font-normal text-gray-500">({g.class_name})</span></td>
-                                   <td className="px-6 py-4">{g.activity}</td>
-                                   <td className="px-6 py-4 text-right">
-                                       <span className={`px-2 py-1 rounded text-xs font-bold ${g.status === 'Verified' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>{g.status}</span>
-                                   </td>
-                               </tr>
-                           ))}
-                       </tbody>
-                   </table>
-              </div>
+          <div className="bg-gradient-to-r from-orange-400 to-amber-500 rounded-3xl p-8 text-white shadow-xl mb-6">
+              <h2 className="text-2xl font-black flex items-center gap-3"><Star className="w-8 h-8 fill-yellow-300 text-yellow-300"/> Validasi Anak Hebat</h2>
+              <p className="text-orange-100 opacity-90">Verifikasi laporan kegiatan positif siswa di rumah/sekolah.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {goodDeeds.length === 0 ? (
+                  <div className="col-span-full text-center py-12 text-slate-400 bg-white rounded-3xl border border-dashed border-slate-200">Belum ada laporan masuk.</div>
+              ) : goodDeeds.map((g) => (
+                  <div key={g.id} className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-lg transition-all flex flex-col">
+                      <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold shadow-md">
+                              {g.student_name.charAt(0)}
+                          </div>
+                          <div>
+                              <div className="font-bold text-slate-800 text-sm">{g.student_name}</div>
+                              <div className="text-xs text-slate-400">{g.class_name} • {g.time}</div>
+                          </div>
+                      </div>
+                      <div className="flex-1 mb-4">
+                          <div className="bg-slate-50 rounded-xl p-3 text-sm font-medium text-slate-700 border border-slate-100">
+                              {g.activity}
+                          </div>
+                      </div>
+                      <div className="flex gap-2 pt-4 border-t border-slate-50">
+                          <button className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-500 text-xs font-bold hover:bg-slate-200 transition-colors">Abaikan</button>
+                          <button className="flex-1 py-2 rounded-xl bg-green-500 text-white text-xs font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-200">Validasi</button>
+                      </div>
+                  </div>
+              ))}
           </div>
       </div>
   );
 
   const renderApiSettings = () => (
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up pb-10">
-          <div className="bg-indigo-900 rounded-3xl p-8 text-white relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-               <h3 className="text-2xl font-black mb-2 relative z-10">Integrasi Sistem</h3>
-               <p className="text-indigo-200 relative z-10">Konfigurasi koneksi ke Supabase dan Google Gemini AI.</p>
-          </div>
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="bg-[#1E293B] rounded-3xl p-8 text-white shadow-2xl border border-slate-700 font-mono">
+              <div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-700">
+                  <Database className="w-6 h-6 text-green-400"/>
+                  <h3 className="text-xl font-bold tracking-tight">System Configuration</h3>
+              </div>
+              
+              <div className="space-y-6">
+                  <div>
+                      <h4 className="text-slate-400 text-xs uppercase font-bold mb-3">Supabase Connection</h4>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="block text-[10px] text-slate-500 mb-1">PROJECT URL</label>
+                              <input 
+                                  type="text" 
+                                  value={customSupabaseUrl} 
+                                  onChange={(e) => setCustomSupabaseUrl(e.target.value)}
+                                  className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-green-400 text-xs outline-none focus:border-green-500"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-[10px] text-slate-500 mb-1">ANON KEY (PUBLIC)</label>
+                              <input 
+                                  type="password" 
+                                  value={customSupabaseKey} 
+                                  onChange={(e) => setCustomSupabaseKey(e.target.value)}
+                                  className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-green-400 text-xs outline-none focus:border-green-500"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-[10px] text-slate-500 mb-1">SERVICE ROLE KEY (SECRET)</label>
+                              <input 
+                                  type="password" 
+                                  value={serviceRoleKey} 
+                                  onChange={(e) => setServiceRoleKey(e.target.value)}
+                                  className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-red-400 text-xs outline-none focus:border-red-500"
+                              />
+                          </div>
+                      </div>
+                  </div>
 
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-               <h4 className="font-bold text-lg text-gray-800 mb-6 flex items-center gap-2"><Database className="w-5 h-5 text-indigo-600"/> Database Configuration (Supabase)</h4>
-               
-               <div className="space-y-4">
-                   <div>
-                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase Project URL</label>
-                       <input 
-                          type="text" 
-                          value={customSupabaseUrl} 
-                          onChange={(e) => setCustomSupabaseUrl(e.target.value)}
-                          className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm"
-                          placeholder="https://your-project.supabase.co"
-                       />
-                   </div>
-                   <div>
-                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase Anon Key (Public)</label>
-                       <div className="relative">
-                          <input 
-                              type="password" 
-                              value={customSupabaseKey} 
-                              onChange={(e) => setCustomSupabaseKey(e.target.value)}
-                              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm pr-10"
-                              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                           />
-                           <Key className="absolute right-3 top-3 w-4 h-4 text-gray-400"/>
-                       </div>
-                   </div>
-                   <div>
-                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supabase Service Role Key (Admin/Secret)</label>
-                       <div className="relative">
-                          <input 
-                              type="password" 
-                              value={serviceRoleKey} 
-                              onChange={(e) => setServiceRoleKey(e.target.value)}
-                              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm pr-10 border-red-200 bg-red-50 focus:ring-red-500"
-                              placeholder="Diperlukan untuk membuat user Auth otomatis..."
-                           />
-                           <Lock className="absolute right-3 top-3 w-4 h-4 text-red-400"/>
-                       </div>
-                       <p className="text-[10px] text-red-500 mt-1 font-bold">* Hanya simpan jika Anda admin. Jangan bagikan key ini.</p>
-                   </div>
-               </div>
-          </div>
-
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-               <h4 className="font-bold text-lg text-gray-800 mb-6 flex items-center gap-2"><Bot className="w-5 h-5 text-indigo-600"/> AI Configuration (Google Gemini)</h4>
-               <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Gemini API Key</label>
-                   <div className="flex gap-2">
-                       <input 
-                          type="password" 
-                          disabled 
-                          value="****************************" 
-                          className="w-full p-3 bg-gray-100 border border-gray-200 rounded-xl font-mono text-sm text-gray-400 cursor-not-allowed"
-                       />
-                       <button className="bg-gray-200 text-gray-600 px-4 rounded-xl font-bold text-xs" disabled>Configured via Env</button>
-                   </div>
-                   <p className="text-xs text-gray-500 mt-2">API Key dikonfigurasi melalui Environment Variables server (Netlify/Vercel) untuk keamanan.</p>
-               </div>
-          </div>
-
-          <div className="flex justify-end pt-4">
-              <button onClick={handleSaveConfig} disabled={savingConfig} className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center gap-2">
-                  {savingConfig ? <RefreshCw className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} Simpan Konfigurasi
-              </button>
+                  <div className="pt-4 border-t border-slate-800 flex justify-end">
+                      <button onClick={handleSaveConfig} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-colors">
+                          <Save className="w-4 h-4"/> SAVE CONFIGURATION
+                      </button>
+                  </div>
+              </div>
           </div>
       </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans pb-10">
-      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
-      
-      {/* Sidebar & Mobile Menu */}
-      <aside className={`fixed inset-y-0 left-0 w-64 bg-[#1e1b4b] text-white z-50 shadow-xl overflow-y-auto transform transition-transform duration-300 lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 border-b border-indigo-900/50 flex justify-between items-center">
-            <h1 className="text-2xl font-black">BISMA <span className="text-xs font-normal block">Admin Portal</span></h1>
-            <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden"><X className="w-6 h-6"/></button>
-        </div>
-        <nav className="p-4 space-y-2">
-            {MENU_CONFIG.map(item => (
-                <button key={item.id} onClick={() => { setActiveView(item.id); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-xl font-medium transition-all ${activeView === item.id ? 'bg-indigo-600 shadow-lg text-white' : 'text-indigo-200 hover:bg-indigo-900/50'}`}>
-                    <item.icon className="w-5 h-5"/> {item.label}
+    <div className="min-h-screen bg-slate-50 flex font-sans">
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+            <div 
+                className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+                onClick={() => setIsMobileMenuOpen(false)}
+            ></div>
+        )}
+
+        {/* Sidebar */}
+        <aside className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-[#1E293B] text-white transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 shadow-2xl flex flex-col`}>
+            <div className="p-6 border-b border-slate-700 flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                     <ShieldCheck className="w-6 h-6 text-white"/>
+                </div>
+                <div>
+                    <h1 className="font-black text-xl tracking-tight">BISMA <span className="text-indigo-400">ADMIN</span></h1>
+                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">School Management</p>
+                </div>
+            </div>
+
+            <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
+                {MENU_CONFIG.map((item) => (
+                    <button
+                        key={item.id}
+                        onClick={() => { setActiveView(item.id); setIsMobileMenuOpen(false); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group ${activeView === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <item.icon className={`w-5 h-5 ${activeView === item.id ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}/>
+                        <span className="text-sm font-bold">{item.label}</span>
+                        {activeView === item.id && <ChevronRight className="w-4 h-4 ml-auto"/>}
+                    </button>
+                ))}
+            </nav>
+
+            <div className="p-4 border-t border-slate-700">
+                <button 
+                    onClick={onLogout}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors font-bold text-sm"
+                >
+                    <LogOut className="w-5 h-5"/> Keluar Aplikasi
                 </button>
-            ))}
-        </nav>
-        <div className="p-4"><button onClick={onLogout} className="flex items-center gap-3 w-full p-3 text-red-300 hover:bg-red-900/20 rounded-xl"><LogOut className="w-5 h-5"/> Keluar</button></div>
-      </aside>
+            </div>
+        </aside>
 
-      <header className="lg:hidden bg-[#1e1b4b] text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md">
-         <span className="font-bold">BISMA ADMIN</span>
-         <button onClick={() => setIsMobileMenuOpen(true)}><Menu className="w-6 h-6"/></button>
-      </header>
+        {/* Main Content Area */}
+        <div className="flex-1 md:ml-72 flex flex-col min-h-screen transition-all duration-300">
+            {/* Header */}
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                 <div className="flex items-center gap-4">
+                     <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 hover:bg-slate-100 rounded-lg text-slate-600">
+                         <Menu className="w-6 h-6"/>
+                     </button>
+                     <h2 className="text-xl font-black text-slate-800 hidden md:block">{MENU_CONFIG.find(m => m.id === activeView)?.label}</h2>
+                 </div>
 
-      <main className="lg:ml-64 p-6 md:p-8">
-        <header className="flex flex-col md:flex-row justify-between gap-4 mb-8">
-            <div><h2 className="text-2xl font-bold text-gray-800 capitalize">{MENU_CONFIG.find(m=>m.id===activeView)?.label}</h2></div>
-        </header>
+                 <div className="flex items-center gap-4">
+                     <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
+                         <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
+                             A
+                         </div>
+                         <div className="hidden md:block pr-2 text-right">
+                             <div className="text-xs font-bold text-slate-800">Administrator</div>
+                             <div className="text-[10px] text-slate-500">Tata Usaha</div>
+                         </div>
+                     </div>
+                 </div>
+            </header>
 
-        {activeView === 'overview' && renderOverview()}
-        {activeView === 'app_config' && renderAppConfig()}
-        {activeView === 'users_auth' && renderUsersAuth()}
-        {activeView === 'students' && renderTable(['No', 'Nama Siswa', 'NIS', 'NISN', 'TTL', 'Orang Tua', 'Kelas'], students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())), 'student')}
-        {activeView === 'teachers' && renderTable(['Nama Guru', 'NIP', 'L/P', 'Jenis', 'Wali Kelas', 'Mapel', 'Status'], teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())), 'teacher')}
-        {activeView === 'schedule' && renderTable(['Hari', 'Jam', 'Kelas', 'Mapel', 'Pengajar'], schedules.filter(s => s.class_name.includes(searchTerm) || s.teacher_name.toLowerCase().includes(searchTerm.toLowerCase())), 'schedule')}
-        {activeView === 'grades' && renderGradesRecap()}
-        {activeView === 'finance' && renderFinance()} 
-        {activeView === 'letters' && renderLetters()}
-        {activeView === 'good_deeds' && renderGoodDeeds()}
-        {activeView === 'api_settings' && renderApiSettings()}
+            {/* Content Render */}
+            <main className="p-4 md:p-8 flex-1 overflow-x-hidden">
+                {activeView === 'overview' && renderOverview()}
+                {activeView === 'app_config' && renderAppConfig()}
+                {activeView === 'users_auth' && renderUsersAuth()}
+                
+                {activeView === 'students' && renderStudents()}
+                {activeView === 'teachers' && renderTeachers()}
+                {activeView === 'schedule' && renderSchedule()}
+                {activeView === 'grades' && renderGradesRecap()}
+                {activeView === 'finance' && renderFinance()}
+                {activeView === 'letters' && renderLetters()}
+                {activeView === 'good_deeds' && renderGoodDeeds()}
+                {activeView === 'api_settings' && renderApiSettings()}
 
-      </main>
+                {/* Placeholder for unimplemented views */}
+                {!MENU_CONFIG.map(m => m.id).includes(activeView) && (
+                    <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
+                        <div className="w-24 h-24 bg-slate-200 rounded-full flex items-center justify-center mb-6">
+                           <LayoutTemplate className="w-10 h-10 text-slate-400"/>
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-300">Modul {activeView}</h3>
+                        <p className="text-slate-400 font-medium">Fitur ini sedang dalam tahap pengembangan.</p>
+                    </div>
+                )}
+            </main>
+        </div>
 
-      {/* --- UNIFIED MODAL (FORM EDIT/ADD) --- */}
-      {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in-up">
-              <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 flex justify-between items-center shrink-0">
-                      <div><h3 className="text-white font-bold text-xl flex items-center gap-2">{editingItem ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {editingItem ? 'Edit Data' : 'Tambah Data Baru'}</h3></div>
-                      <button onClick={() => setIsModalOpen(false)} className="bg-white/10 hover:bg-white/20 p-2 rounded-full text-white transition-colors"><X className="w-5 h-5" /></button>
-                  </div>
-                  <div className="overflow-y-auto p-6 md:p-8 custom-scrollbar">
-                    <form onSubmit={handleSave} className="space-y-6">
-                        {modalType === 'schedule' && (
-                            <>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2"><label className="block text-xs font-bold text-gray-500 uppercase">Hari KBM</label><select name="day" defaultValue={editingItem?.day || 'Senin'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">{['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'].map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                                    <div className="space-y-2"><label className="block text-xs font-bold text-gray-500 uppercase">Kelas</label><select name="class" defaultValue={editingItem?.class_name || '5A'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">{['1A','1B','2A','2B','3A','4A','5A','6A'].map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                                </div>
-                                <div className="space-y-2"><label className="block text-xs font-bold text-gray-500 uppercase">Pilih Jam (Checklist)</label><div className="grid grid-cols-4 md:grid-cols-8 gap-2">{[1,2,3,4,5,6,7,8].map(j => (<div key={j} onClick={() => { const current = scheduleForm.selectedHours; setScheduleForm({...scheduleForm, selectedHours: current.includes(j) ? current.filter(x => x !== j) : [...current, j]}); }} className={`cursor-pointer rounded-lg border-2 p-2 text-center ${scheduleForm.selectedHours.includes(j) ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold' : 'border-gray-200 hover:border-indigo-300 text-gray-600'}`}>{j}</div>))}</div></div>
-                                <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                                    <div className="flex justify-between items-center"><label className="block text-xs font-bold text-gray-500 uppercase">Mapel</label><button type="button" onClick={() => setScheduleForm({...scheduleForm, isEkstra: !scheduleForm.isEkstra})} className="text-xs text-indigo-600 font-bold hover:underline">{scheduleForm.isEkstra ? 'Kembali ke Mapel' : '+ Ekstra'}</button></div>
-                                    {!scheduleForm.isEkstra ? (<div className="grid grid-cols-2 md:grid-cols-3 gap-2">{STANDARD_SUBJECTS.map(subj => (<div key={subj} onClick={() => setScheduleForm({...scheduleForm, selectedSubject: subj})} className={`cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${scheduleForm.selectedSubject === subj ? 'bg-indigo-600 text-white' : 'bg-white border text-gray-600'}`}>{scheduleForm.selectedSubject === subj ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}{subj}</div>))}</div>) : (<input type="text" placeholder="Nama Ekstrakurikuler..." className="w-full p-3 border rounded-xl" value={scheduleForm.customSubject} onChange={(e) => setScheduleForm({...scheduleForm, customSubject: e.target.value})}/>)}
-                                </div>
-                                <div className="space-y-2"><label className="block text-xs font-bold text-gray-500 uppercase">Pengajar</label><select name="teacher" defaultValue={editingItem?.teacher_name} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">{teachers.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}</select></div>
-                            </>
-                        )}
-                        {modalType === 'student' && (
-                            <>
-                                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Lengkap</label><input name="name" defaultValue={editingItem?.name} required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">NISN</label><input name="nisn" defaultValue={editingItem?.nisn} required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">NIS (Lokal)</label><input name="nis" defaultValue={editingItem?.nis} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tempat Lahir</label><input name="tempat_lahir" defaultValue={editingItem?.tempat_lahir} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tanggal Lahir</label><input name="tanggal_lahir" type="date" defaultValue={editingItem?.tanggal_lahir} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Ayah</label><input name="nama_ayah" defaultValue={editingItem?.nama_ayah} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Ibu</label><input name="nama_ibu" defaultValue={editingItem?.nama_ibu} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kelas</label><select name="class" defaultValue={editingItem?.class_name || '1A'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl">{['1A','1B','2A','2B','3A','4A','5A','6A'].map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label><select name="status" defaultValue={editingItem?.status || 'Active'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
-                                </div>
-                                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label><input name="password" defaultValue={editingItem?.password || 'siswa'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                            </>
-                        )}
-                        {modalType === 'teacher' && (
-                            <>
-                                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Guru</label><input name="name" defaultValue={editingItem?.name} required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">NIP</label><input name="nip" defaultValue={editingItem?.nip} required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Jenis Kelamin</label><select name="jenis_kelamin" defaultValue={editingItem?.jenis_kelamin || 'P'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Jenis Guru</label><select name="jenis_guru" defaultValue={editingItem?.jenis_guru || 'Guru Mapel'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl"><option value="Guru Kelas">Guru Kelas</option><option value="Guru Mapel">Guru Mapel</option></select></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Wali Kelas</label><select name="wali_kelas" defaultValue={editingItem?.wali_kelas || '-'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl"><option value="-">Bukan Wali Kelas</option>{['1A','1B','2A','2B','3A','4A','5A','6A'].map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                                </div>
-                                
-                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Mata Pelajaran (Centang)</label>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        {TEACHER_SUBJECT_OPTIONS.map((subject) => (
-                                            <label key={subject} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${teacherSubjects.includes(subject) ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                                                <input 
-                                                    type="checkbox"
-                                                    name="subjects_checkbox" 
-                                                    value={subject}
-                                                    checked={teacherSubjects.includes(subject)}
-                                                    onChange={() => toggleTeacherSubject(subject)}
-                                                    className="w-4 h-4 accent-indigo-600 rounded"
-                                                />
-                                                <span className={`text-sm font-medium ${teacherSubjects.includes(subject) ? 'text-indigo-800' : 'text-gray-700'}`}>{subject}</span>
-                                            </label>
-                                        ))}
+        {/* Hidden Inputs */}
+        <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            className="hidden" 
+            accept=".csv"
+        />
+
+        {/* --- MODALS --- */}
+
+        {/* Import Result Modal */}
+        {importResult.isOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-fade-in-up">
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${importResult.status === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                        {importResult.status === 'success' ? <CheckCircle className="w-8 h-8"/> : <XCircle className="w-8 h-8"/>}
+                    </div>
+                    <h3 className="text-xl font-black text-center text-slate-800 mb-2">{importResult.title}</h3>
+                    <p className="text-center text-slate-600 text-sm mb-6">{importResult.message}</p>
+                    
+                    {importResult.details && importResult.details.length > 0 && (
+                        <div className="bg-slate-50 rounded-xl p-3 mb-6 max-h-40 overflow-y-auto text-xs text-slate-500 border border-slate-200">
+                            <ul className="list-disc list-inside space-y-1">
+                                {importResult.details.map((d, i) => <li key={i}>{d}</li>)}
+                            </ul>
+                        </div>
+                    )}
+                    
+                    <button onClick={() => setImportResult({...importResult, isOpen: false})} className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Add/Edit Modal */}
+        {isModalOpen && modalType && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-fade-in-up">
+                    <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="font-bold text-xl text-slate-800">{editingItem ? 'Edit Data' : 'Tambah Data'} {modalType === 'student' ? 'Siswa' : modalType === 'teacher' ? 'Guru' : 'Jadwal'}</h3>
+                        <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><X className="w-5 h-5"/></button>
+                    </div>
+                    
+                    <div className="p-6 overflow-y-auto custom-scrollbar">
+                        <form id="dataForm" onSubmit={handleSave} className="space-y-4">
+                            {/* DYNAMIC FORM FIELDS BASED ON MODAL TYPE */}
+                            {modalType === 'student' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NISN <span className="text-red-500">*</span></label>
+                                        <input name="nisn" required defaultValue={editingItem?.nisn} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Nama Lengkap <span className="text-red-500">*</span></label>
+                                        <input name="name" required defaultValue={editingItem?.name} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Kelas <span className="text-red-500">*</span></label>
+                                        <select name="class" required defaultValue={editingItem?.class_name} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="">Pilih...</option>
+                                            {['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6', 'Kelas 1A', 'Kelas 1B', 'Kelas 2A', 'Kelas 2B', 'Kelas 3A', 'Kelas 3B', 'Kelas 4A', 'Kelas 4B', 'Kelas 5A', 'Kelas 5B', 'Kelas 6A', 'Kelas 6B'].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NIS</label>
+                                        <input name="nis" defaultValue={editingItem?.nis} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Tempat Lahir</label>
+                                        <input name="tempat_lahir" defaultValue={editingItem?.tempat_lahir} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Tanggal Lahir</label>
+                                        <input name="tanggal_lahir" type="date" defaultValue={editingItem?.tanggal_lahir} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Nama Ayah</label>
+                                        <input name="nama_ayah" defaultValue={editingItem?.nama_ayah} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Nama Ibu</label>
+                                        <input name="nama_ibu" defaultValue={editingItem?.nama_ibu} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Password Login</label>
+                                        <input name="password" defaultValue={editingItem?.password || '123456'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Status</label>
+                                        <select name="status" defaultValue={editingItem?.status || 'Active'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="Active">Aktif</option>
+                                            <option value="Inactive">Non-Aktif</option>
+                                            <option value="Graduated">Lulus</option>
+                                        </select>
                                     </div>
                                 </div>
+                            )}
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label><select name="status" defaultValue={editingItem?.status || 'Active'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl"><option value="Active">Active</option><option value="Leave">Cuti</option></select></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label><input name="password" defaultValue={editingItem?.password || 'guru'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl" /></div>
+                            {modalType === 'teacher' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NIP / NIPPPK <span className="text-red-500">*</span></label>
+                                        <input name="nip" required defaultValue={editingItem?.nip} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Nama Lengkap <span className="text-red-500">*</span></label>
+                                        <input name="name" required defaultValue={editingItem?.name} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Jenis Kelamin</label>
+                                        <select name="jenis_kelamin" defaultValue={editingItem?.jenis_kelamin || 'P'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="L">Laki-laki</option>
+                                            <option value="P">Perempuan</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Jenis Guru</label>
+                                        <select name="jenis_guru" defaultValue={editingItem?.jenis_guru || 'Guru Kelas'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="Guru Kelas">Guru Kelas</option>
+                                            <option value="Guru Mapel">Guru Mapel</option>
+                                            <option value="Kepala Sekolah">Kepala Sekolah</option>
+                                            <option value="Staff">Staff / Tendik</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Wali Kelas (Opsional)</label>
+                                        <select name="wali_kelas" defaultValue={editingItem?.wali_kelas} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="">Bukan Wali Kelas</option>
+                                            {['1A','1B','2A','2B','3A','3B','4A','4B','5A','5B','6A','6B'].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1 col-span-full">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Mata Pelajaran yang Diampu</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {TEACHER_SUBJECT_OPTIONS.map(subj => (
+                                                <button 
+                                                    key={subj}
+                                                    type="button"
+                                                    onClick={() => toggleTeacherSubject(subj)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${teacherSubjects.includes(subj) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}
+                                                >
+                                                    {subj}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <input type="hidden" name="subject" value={teacherSubjects.join(', ')} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Password Login</label>
+                                        <input name="password" defaultValue={editingItem?.password || '123456'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Status</label>
+                                        <select name="status" defaultValue={editingItem?.status || 'Active'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="Active">Aktif</option>
+                                            <option value="Inactive">Non-Aktif</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            </>
-                        )}
-                        <div className="pt-6 flex gap-3 border-t border-gray-100">
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl">Batal</button>
-                            <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Simpan</button>
-                        </div>
-                    </form>
-                  </div>
-              </div>
-          </div>
-      )}
+                            )}
 
-      {/* IMPORT FEEDBACK MODAL */}
-      {importResult.isOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-                  <div className={`p-6 flex items-center gap-4 ${importResult.status === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                      <div className={`p-3 rounded-full ${importResult.status === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
-                          {importResult.status === 'success' ? <CheckCircle className="w-8 h-8" /> : <AlertTriangle className="w-8 h-8" />}
-                      </div>
-                      <div>
-                          <h3 className="font-bold text-lg">{importResult.title}</h3>
-                          <p className="text-sm opacity-90">{importResult.message}</p>
-                      </div>
-                  </div>
-                  {importResult.details && importResult.details.length > 0 && (
-                      <div className="p-6 bg-slate-50 border-t border-b border-gray-100 flex-1 overflow-y-auto custom-scrollbar">
-                          <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2"><FileWarning className="w-4 h-4"/> Detail Laporan</h4>
-                          <div className="space-y-2">{importResult.details.map((d, i) => <div key={i} className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 font-mono shadow-sm"><XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" /><span>{d}</span></div>)}</div>
-                      </div>
-                  )}
-                  <div className="p-4 bg-white flex justify-end"><button onClick={() => setImportResult({...importResult, isOpen: false})} className="px-6 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors shadow-lg">Tutup</button></div>
-              </div>
-          </div>
-      )}
+                            {modalType === 'schedule' && (
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Hari</label>
+                                        <select name="day" required defaultValue={editingItem?.day} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            {['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'].map(d => <option key={d} value={d}>{d}</option>)}
+                                        </select>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Jam Ke- (Bisa pilih banyak)</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {[1,2,3,4,5,6,7,8].map(h => (
+                                                <button
+                                                    key={h}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const exists = scheduleForm.selectedHours.includes(h);
+                                                        setScheduleForm(p => ({
+                                                            ...p,
+                                                            selectedHours: exists ? p.selectedHours.filter(x => x !== h) : [...p.selectedHours, h]
+                                                        }));
+                                                    }}
+                                                    className={`w-10 h-10 rounded-lg font-bold border ${scheduleForm.selectedHours.includes(h) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}
+                                                >
+                                                    {h}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Kelas</label>
+                                        <select name="class" required defaultValue={editingItem?.class_name} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="">Pilih...</option>
+                                            {['1A','1B','2A','2B','3A','3B','4A','4B','5A','5B','6A','6B'].map(c => <option key={c} value={c}>Kelas {c}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Mata Pelajaran</label>
+                                        <div className="flex gap-4 mb-2">
+                                            <label className="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
+                                                <input type="radio" checked={!scheduleForm.isEkstra} onChange={() => setScheduleForm(p => ({...p, isEkstra: false}))} className="accent-indigo-600"/> Mapel Utama
+                                            </label>
+                                            <label className="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
+                                                <input type="radio" checked={scheduleForm.isEkstra} onChange={() => setScheduleForm(p => ({...p, isEkstra: true}))} className="accent-indigo-600"/> Muatan Lokal / Lainnya
+                                            </label>
+                                        </div>
+                                        
+                                        {!scheduleForm.isEkstra ? (
+                                            <select 
+                                                value={scheduleForm.selectedSubject} 
+                                                onChange={(e) => setScheduleForm(p => ({...p, selectedSubject: e.target.value}))}
+                                                className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                                            >
+                                                <option value="">-- Pilih Mapel --</option>
+                                                {STANDARD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        ) : (
+                                            <input 
+                                                value={scheduleForm.customSubject} 
+                                                onChange={(e) => setScheduleForm(p => ({...p, customSubject: e.target.value}))}
+                                                placeholder="Tulis nama mapel..."
+                                                className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                                            />
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Guru Pengajar</label>
+                                        <select name="teacher" required defaultValue={editingItem?.teacher_name} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                                            <option value="">Pilih Guru...</option>
+                                            {teachers.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                        </form>
+                    </div>
+
+                    <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+                        <button onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Batal</button>
+                        <button type="submit" form="dataForm" className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700">Simpan Data</button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

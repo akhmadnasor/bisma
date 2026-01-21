@@ -1,27 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Award, Calendar, 
   LogOut, Star, Recycle, FileText, Wallet, ArrowUpRight,
-  Sun, Moon, Utensils, Heart, Users, CheckCircle, ArrowLeft, Clock, X, AlertTriangle, Trophy, Home, Bot, DoorOpen, Send, ListChecks, PenTool, Plus, Camera, Mail
+  Sun, Moon, Utensils, Heart, Users, CheckCircle, ArrowLeft, Clock, X, AlertTriangle, Trophy, Home, Bot, DoorOpen, Send, ListChecks, PenTool, Plus, Camera, Mail, TrendingDown
 } from 'lucide-react';
 import { Task, TrashTransaction } from '../types';
+import { supabase } from '../services/supabase';
 
 interface StudentProps {
+  user: any; // Add user prop
   onLogout: () => void;
 }
 
-const StudentDashboard: React.FC<StudentProps> = ({ onLogout }) => {
+const StudentDashboard: React.FC<StudentProps> = ({ user, onLogout }) => {
   const [activeView, setActiveView] = useState<'dashboard' | 'anak_hebat' | 'prestasi' | 'tasks' | 'izin'>('dashboard');
   const [showWastePopup, setShowWastePopup] = useState(false);
-  const [showSchedule, setShowSchedule] = useState(false);
-  const [showComingSoon, setShowComingSoon] = useState(false);
-
-  // Mock Data
-  const wasteHistory: TrashTransaction[] = [
-      { id: 1, date: '2023-10-25', student_name: 'Rizky', type: 'Setor Plastik', weight: 2.5, amount: 7500, status: 'Deposit', description: 'Botol bersih' },
-      { id: 2, date: '2023-10-20', student_name: 'Rizky', type: 'Pembelian ATK', weight: 0, amount: 3000, status: 'Withdraw', description: 'Buku Tulis Sidu' },
-      { id: 3, date: '2023-10-15', student_name: 'Rizky', type: 'Setor Kardus', weight: 5.0, amount: 7500, status: 'Deposit', description: 'Bekas paket' },
-  ];
+  const [wasteHistory, setWasteHistory] = useState<TrashTransaction[]>([]);
+  const [wasteBalance, setWasteBalance] = useState(0);
 
   // Permission Form State
   const [permissionForm, setPermissionForm] = useState({
@@ -30,6 +25,34 @@ const StudentDashboard: React.FC<StudentProps> = ({ onLogout }) => {
       reason: '',
       photo: null as File | null
   });
+
+  // Determine Avatar from DB or fallback
+  const gender = user.profile?.jenis_kelamin || (user.user_metadata?.name?.toLowerCase().includes('putri') ? 'P' : 'L');
+  
+  const avatarUrl = gender === 'P' 
+    ? "https://cdn-icons-png.flaticon.com/512/2922/2922566.png" 
+    : "https://cdn-icons-png.flaticon.com/512/2922/2922510.png";
+
+  useEffect(() => {
+      fetchWasteData();
+  }, [user]);
+
+  const fetchWasteData = async () => {
+      // Fetch data where student_id matches current user
+      // Assuming user.id corresponds to student_id or finding via metadata
+      const { data } = await supabase.from('trash_transactions')
+          .select('*')
+          .eq('student_id', user.id) // Assuming user.id is the numeric student ID
+          .order('date', { ascending: false });
+      
+      if (data) {
+          setWasteHistory(data);
+          const balance = data.reduce((acc: number, curr: any) => {
+              return curr.status === 'Deposit' ? acc + curr.amount : acc - curr.amount;
+          }, 0);
+          setWasteBalance(balance);
+      }
+  };
 
   const handlePermissionSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -44,28 +67,32 @@ const StudentDashboard: React.FC<StudentProps> = ({ onLogout }) => {
                   <button onClick={() => setShowWastePopup(false)} className="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30"><X className="w-5 h-5"/></button>
                   <h3 className="text-xl font-bold mb-1">Tabungan Sampah</h3>
                   <p className="text-green-100 text-xs opacity-90">Saldo saat ini</p>
-                  <div className="text-3xl font-black mt-1">Rp 12.000</div>
+                  <div className="text-3xl font-black mt-1">Rp {wasteBalance.toLocaleString()}</div>
               </div>
               
               <div className="p-6 flex-1 overflow-y-auto custom-scrollbar bg-gray-50">
                   <h4 className="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">Riwayat Transaksi</h4>
                   <div className="space-y-3">
-                      {wasteHistory.map((item) => (
-                          <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
-                              <div className="flex items-center gap-3">
-                                  <div className={`p-2 rounded-full ${item.status === 'Deposit' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                      {item.status === 'Deposit' ? <ArrowUpRight className="w-4 h-4"/> : <ArrowUpRight className="w-4 h-4 rotate-180"/>}
+                      {wasteHistory.length === 0 ? (
+                          <div className="text-center text-gray-400 py-8 text-xs italic">Belum ada transaksi sampah.</div>
+                      ) : (
+                          wasteHistory.map((item) => (
+                              <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                                  <div className="flex items-center gap-3">
+                                      <div className={`p-2 rounded-full ${item.status === 'Deposit' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                          {item.status === 'Deposit' ? <ArrowUpRight className="w-4 h-4"/> : <ArrowUpRight className="w-4 h-4 rotate-180"/>}
+                                      </div>
+                                      <div>
+                                          <div className="font-bold text-gray-800 text-sm">{item.type}</div>
+                                          <div className="text-xs text-gray-400">{item.date} • {item.description}</div>
+                                      </div>
                                   </div>
-                                  <div>
-                                      <div className="font-bold text-gray-800 text-sm">{item.type}</div>
-                                      <div className="text-xs text-gray-400">{item.date} • {item.description}</div>
+                                  <div className={`font-bold font-mono text-sm ${item.status === 'Deposit' ? 'text-green-600' : 'text-red-600'}`}>
+                                      {item.status === 'Deposit' ? '+' : '-'} Rp {item.amount.toLocaleString()}
                                   </div>
                               </div>
-                              <div className={`font-bold font-mono text-sm ${item.status === 'Deposit' ? 'text-green-600' : 'text-red-600'}`}>
-                                  {item.status === 'Deposit' ? '+' : '-'} Rp {item.amount.toLocaleString()}
-                              </div>
-                          </div>
-                      ))}
+                          ))
+                      )}
                   </div>
               </div>
           </div>
@@ -122,147 +149,142 @@ const StudentDashboard: React.FC<StudentProps> = ({ onLogout }) => {
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Foto Surat Dokter / Bukti (Opsional)</label>
                               <label className="w-full h-32 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-50 transition-colors">
                                   <Camera className="w-8 h-8 mb-2"/>
-                                  <span className="text-xs">Ketuk untuk upload foto</span>
-                                  <input type="file" className="hidden" accept="image/*" />
+                                  <span className="text-xs font-bold">Ketuk untuk ambil foto</span>
+                                  <input type="file" className="hidden" accept="image/*" onChange={(e) => setPermissionForm({...permissionForm, photo: e.target.files?.[0] || null})} />
                               </label>
                           </div>
                       </div>
-                  </div>
 
-                  <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2">
-                      <Send className="w-5 h-5"/> Kirim Permohonan
-                  </button>
+                      <button type="submit" className="w-full mt-6 py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
+                          Kirim Permohonan
+                      </button>
+                  </div>
               </form>
           </div>
       </div>
   );
 
-  // Render Logic
+  // Main Dashboard Render
   if (activeView === 'izin') return renderPermissionForm();
-  
-  // (Assuming 'tasks' render function from previous code is preserved or imported)
-  
+
+  if (activeView !== 'dashboard') {
+    return (
+        <div className="min-h-screen bg-indigo-50 flex flex-col items-center justify-center p-6 text-center font-sans">
+            <Trophy className="w-16 h-16 text-indigo-300 mb-4"/>
+            <h2 className="text-xl font-bold text-gray-700">Fitur Segera Hadir</h2>
+            <p className="text-gray-500 mb-6">Menu ini sedang dalam pengembangan.</p>
+            <button onClick={() => setActiveView('dashboard')} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors">Kembali</button>
+        </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#FFF7ED] font-sans pb-28">
-      {/* Top Bar */}
-      <header className="bg-orange-500 p-6 pb-28 rounded-b-[40px] shadow-lg relative overflow-hidden">
-         <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-         <div className="flex justify-between items-start relative z-10 text-white">
-            <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white/20 rounded-full border-2 border-white/50 p-1">
-                    <img src="https://picsum.photos/id/64/100/100" className="w-full h-full rounded-full object-cover" alt="Siswa" />
-                </div>
-                <div>
-                    <h1 className="font-bold text-lg leading-tight">Hai, Rizky!</h1>
-                    <p className="text-orange-100 text-xs">Kelas 5A • SDN Baujeng 1</p>
-                </div>
-            </div>
-            <button onClick={onLogout} className="p-2 bg-white/20 rounded-full hover:bg-white/30"><LogOut className="w-5 h-5"/></button>
+    <div className="min-h-screen bg-[#F0F9FF] pb-24 relative overflow-hidden font-sans">
+      {/* Header */}
+      <header className="bg-indigo-600 p-6 pt-8 rounded-b-[2.5rem] shadow-xl relative overflow-hidden z-10">
+         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+         
+         <div className="flex justify-between items-start relative z-10">
+             <div className="flex items-center gap-4">
+                 <div className="w-14 h-14 bg-white rounded-full p-1 shadow-md">
+                     <img src={avatarUrl} className="w-full h-full object-contain" alt="Student" />
+                 </div>
+                 <div>
+                     <p className="text-indigo-200 text-xs font-medium mb-0.5">Selamat Pagi,</p>
+                     <h2 className="text-white font-black text-xl leading-tight">{user.user_metadata?.name || 'Siswa'}</h2>
+                     <span className="inline-block bg-white/20 px-2 py-0.5 rounded text-[10px] text-white font-bold mt-1">
+                         {user.user_metadata?.class_name || 'Siswa SD'}
+                     </span>
+                 </div>
+             </div>
+             <button onClick={onLogout} className="p-2 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-colors">
+                 <LogOut className="w-5 h-5" />
+             </button>
+         </div>
+
+         {/* Quick Stats Card */}
+         <div className="mt-6 bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex justify-between items-center text-white">
+             <div className="text-center">
+                 <div className="text-xs text-indigo-200 mb-1">Kehadiran</div>
+                 <div className="font-black text-lg">100%</div>
+             </div>
+             <div className="w-px h-8 bg-white/20"></div>
+             <div className="text-center cursor-pointer" onClick={() => setShowWastePopup(true)}>
+                 <div className="text-xs text-indigo-200 mb-1">Tabungan</div>
+                 <div className="font-black text-lg">Rp {wasteBalance.toLocaleString()}</div>
+             </div>
+             <div className="w-px h-8 bg-white/20"></div>
+             <div className="text-center">
+                 <div className="text-xs text-indigo-200 mb-1">Poin</div>
+                 <div className="font-black text-lg">0</div>
+             </div>
          </div>
       </header>
 
-      <main className="px-5 -mt-20 relative z-20 space-y-8 animate-fade-in-up">
-        
-        {/* KOINKU (Tabungan Sampah) - Clickable */}
-        <button 
-            onClick={() => setShowWastePopup(true)}
-            className="w-full text-left bg-gradient-to-br from-[#059669] to-[#10B981] rounded-3xl p-6 text-white shadow-xl shadow-green-200 relative overflow-hidden transform transition-transform hover:scale-[1.02] active:scale-95"
-        >
-            <div className="relative z-10">
-                <div className="flex justify-between items-start mb-6">
-                    <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                        <Recycle className="w-4 h-4 text-white"/>
-                        <span className="text-xs font-bold tracking-wide">TABUNGAN SAMPAH</span>
-                    </div>
-                    <Recycle className="w-8 h-8 text-white/80"/>
-                </div>
-                <div className="space-y-1 mb-4">
-                     <p className="text-sm text-green-100 font-medium">Total Saldo Saat Ini</p>
-                     <h2 className="text-4xl font-black tracking-tight">Rp 12.000</h2>
-                </div>
-                <div className="bg-white/20 backdrop-blur-md rounded-xl p-2 text-center text-xs font-bold text-white tracking-wide border border-white/30 flex items-center justify-center gap-2">
-                    <Star className="w-3 h-3 text-yellow-300 fill-yellow-300"/> Klik untuk lihat riwayat
-                </div>
-            </div>
-            <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-        </button>
+      {/* Menu Grid */}
+      <div className="px-6 py-6 grid grid-cols-2 gap-4 relative z-10">
+          <button onClick={() => setActiveView('izin')} className="bg-white p-4 rounded-3xl shadow-sm border border-indigo-50 flex flex-col items-center gap-3 hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
+                  <Mail className="w-6 h-6"/>
+              </div>
+              <span className="font-bold text-gray-700 text-sm">Izin Tidak Masuk</span>
+          </button>
+          
+          <button onClick={() => setActiveView('tasks')} className="bg-white p-4 rounded-3xl shadow-sm border border-indigo-50 flex flex-col items-center gap-3 hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-500 group-hover:scale-110 transition-transform">
+                  <ListChecks className="w-6 h-6"/>
+              </div>
+              <span className="font-bold text-gray-700 text-sm">Tugas Sekolah</span>
+          </button>
+          
+          <button onClick={() => setShowWastePopup(true)} className="bg-white p-4 rounded-3xl shadow-sm border border-indigo-50 flex flex-col items-center gap-3 hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
+                  <Recycle className="w-6 h-6"/>
+              </div>
+              <span className="font-bold text-gray-700 text-sm">Bank Sampah</span>
+          </button>
 
-        {/* 3D MENU GRID */}
-        <div>
-            <h3 className="font-bold text-gray-800 mb-4 text-lg px-1">Menu Utama</h3>
-            <div className="grid grid-cols-3 gap-4">
-                {[
-                  { id: 'tasks', label: 'Tugas', icon: PenTool, color: 'from-red-400 to-red-600', shadow: 'shadow-red-200' }, 
-                  { id: 'jadwal', label: 'Jadwal', icon: Calendar, color: 'from-blue-400 to-blue-600', shadow: 'shadow-blue-200' },
-                  { id: 'izin', label: 'Izin/Sakit', icon: Mail, color: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-200' }, // Changed
-                  { id: 'prestasi', label: 'Prestasi', icon: Award, color: 'from-purple-400 to-purple-600', shadow: 'shadow-purple-200' },
-                  { id: 'anak_hebat', label: 'Anak Hebat', icon: Star, color: 'from-yellow-400 to-yellow-600', shadow: 'shadow-yellow-200' },
-                  { id: 'lainnya', label: 'Lainnya', icon: FileText, color: 'from-gray-400 to-gray-600', shadow: 'shadow-gray-200' },
-                ].map((item, idx) => (
-                    <button 
-                        key={idx}
-                        onClick={() => {
-                            if(item.id === 'izin') setActiveView('izin');
-                            else if(item.id === 'tasks') setActiveView('tasks');
-                            else setShowComingSoon(true);
-                        }}
-                        className="group flex flex-col items-center gap-2 transition-transform active:scale-95"
-                    >
-                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-b ${item.color} flex items-center justify-center text-white shadow-lg ${item.shadow} border-b-4 border-black/10 group-hover:-translate-y-1 transition-transform`}>
-                            {item.id === 'izin' ? <Mail className="w-7 h-7 drop-shadow-md" /> : <item.icon className="w-7 h-7 drop-shadow-md" />}
-                        </div>
-                        <span className="text-xs font-bold text-gray-600">{item.label}</span>
-                    </button>
-                ))}
-            </div>
-        </div>
-      </main>
+          <button onClick={() => setActiveView('anak_hebat')} className="bg-white p-4 rounded-3xl shadow-sm border border-indigo-50 flex flex-col items-center gap-3 hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-yellow-100 rounded-2xl flex items-center justify-center text-yellow-600 group-hover:scale-110 transition-transform">
+                  <Star className="w-6 h-6"/>
+              </div>
+              <span className="font-bold text-gray-700 text-sm">Anak Hebat</span>
+          </button>
+      </div>
 
-      {/* FOOTER */}
-      <div className="fixed bottom-4 left-4 right-4 z-50">
-          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-2xl p-2 flex justify-between items-center max-w-sm mx-auto border border-white/50">
-              <button 
-                onClick={() => setActiveView('dashboard')}
-                className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-full transition-all ${activeView === 'dashboard' ? 'bg-orange-100 text-orange-600' : 'text-gray-400 hover:text-gray-600'}`}
-              >
-                  <Home className={`w-6 h-6 ${activeView === 'dashboard' ? 'fill-orange-600' : ''}`}/>
-                  <span className="text-[10px] font-bold">Home</span>
-              </button>
-
-              <button 
-                onClick={() => { setShowComingSoon(true); }}
-                className="flex-1 -mt-8"
-              >
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg border-4 border-[#FFF7ED] transform transition-transform active:scale-95">
-                      <Bot className="w-8 h-8 text-white"/>
+      {/* Today's Schedule Preview */}
+      <div className="px-6 mb-20">
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-indigo-500"/> Jadwal Hari Ini
+                  </h3>
+                  <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg font-bold">{new Date().toLocaleDateString('id-ID', {weekday: 'long'})}</span>
+              </div>
+              <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="font-bold text-gray-400 text-xs w-10">07:00</div>
+                      <div className="w-1 h-8 bg-indigo-500 rounded-full"></div>
+                      <div>
+                          <div className="font-bold text-gray-800 text-sm">Upacara Bendera</div>
+                          <div className="text-xs text-gray-400">Lapangan Sekolah</div>
+                      </div>
                   </div>
-                  <span className="text-[10px] font-bold text-blue-600 block text-center mt-1">Tanya Bisma</span>
-              </button>
-
-              <button 
-                onClick={onLogout}
-                className="flex-1 flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-              >
-                  <DoorOpen className="w-6 h-6"/>
-                  <span className="text-[10px] font-bold">Keluar</span>
-              </button>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="font-bold text-gray-400 text-xs w-10">08:00</div>
+                      <div className="w-1 h-8 bg-orange-500 rounded-full"></div>
+                      <div>
+                          <div className="font-bold text-gray-800 text-sm">Matematika</div>
+                          <div className="text-xs text-gray-400">Bu Guru</div>
+                      </div>
+                  </div>
+              </div>
           </div>
       </div>
 
+      {/* Popups */}
       {showWastePopup && renderWastePopup()}
-      
-      {showComingSoon && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in-up" onClick={() => setShowComingSoon(false)}>
-              <div className="bg-white rounded-3xl p-8 text-center max-w-sm shadow-2xl">
-                  <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                      <Star className="w-10 h-10 text-yellow-500 fill-yellow-500"/>
-                  </div>
-                  <h3 className="text-xl font-black text-gray-800 mb-2">Coming Soon!</h3>
-                  <p className="text-gray-500 text-sm">Fitur ini sedang dalam pengembangan oleh tim IT Sekolah.</p>
-                  <button onClick={() => setShowComingSoon(false)} className="mt-6 w-full py-3 bg-gray-900 text-white font-bold rounded-xl">Oke, Ditunggu!</button>
-              </div>
-          </div>
-      )}
+
     </div>
   );
 };

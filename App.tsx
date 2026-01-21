@@ -148,7 +148,7 @@ function App() {
           return <AdminDashboard onLogout={handleLogout} />;
       }
       if (user.role === 'student') {
-          return <StudentDashboard onLogout={handleLogout} />;
+          return <StudentDashboard user={user} onLogout={handleLogout} />;
       }
       // Default to Teacher Dashboard
       return (
