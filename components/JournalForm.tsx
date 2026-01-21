@@ -9,6 +9,20 @@ interface JournalFormProps {
   onBack: () => void;
 }
 
+// Helper to safely extract error message from any object
+const getErrorMessage = (error: any): string => {
+    if (!error) return 'Unknown error';
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) return error.message;
+    if (error.message) return error.message;
+    if (error.error_description) return error.error_description;
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return String(error);
+    }
+};
+
 const JournalForm: React.FC<JournalFormProps> = ({ user, onBack }) => {
   const [step, setStep] = useState(1);
   const [selectedClass, setSelectedClass] = useState('');
@@ -94,8 +108,8 @@ const JournalForm: React.FC<JournalFormProps> = ({ user, onBack }) => {
           onBack();
       } catch (err: any) {
           console.error(err);
-          // Allow demo to proceed even if Supabase write fails
-          alert(`Simulasi: Jurnal Tersimpan (Database Error: ${err.message})`);
+          // Allow demo to proceed even if Supabase write fails but alert safely
+          alert(`Simulasi: Jurnal Tersimpan (Database Error: ${getErrorMessage(err)})`);
           onBack();
       } finally {
           setLoading(false);

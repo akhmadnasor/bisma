@@ -7,6 +7,8 @@ import {
   Check, TrendingUp, ChevronRight, MapPin, FileText
 } from 'lucide-react';
 import { sendMessageToGemini, ChatMessage } from '../services/gemini';
+import { supabase } from '../services/supabase';
+import { MOCK_STUDENTS_FALLBACK, STANDARD_SUBJECTS } from '../constants';
 
 interface TeacherDashboardProps {
   user: any;
@@ -14,19 +16,40 @@ interface TeacherDashboardProps {
   onNavigate: (page: string) => void;
 }
 
+// Helper to safely extract error message from any object
+const getErrorMessage = (error: any): string => {
+    if (!error) return 'Unknown error';
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) return error.message;
+    if (error.message) return error.message;
+    if (error.error_description) return error.error_description;
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return String(error);
+    }
+};
+
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onNavigate }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeFeature, setActiveFeature] = useState<string | null>(null);
   
   // Schedule Popup State
   const [showSchedulePopup, setShowSchedulePopup] = useState(false);
-
-  // Data States
-  const [inputNilaiTab, setInputNilaiTab] = useState<'pengetahuan' | 'keterampilan'>('pengetahuan');
-  const [nilaiType, setNilaiType] = useState('PH1');
-  const [trashWeight, setTrashWeight] = useState(0);
+  
+  // Real Data States
+  const [mySchedule, setMySchedule] = useState<any[]>([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  
+  // Data States for Grades
+  const [inputNilaiClass, setInputNilaiClass] = useState('5A');
+  const [selectedSubject, setSelectedSubject] = useState('Matematika');
+  const [students, setStudents] = useState<any[]>([]);
+  const [gradesData, setGradesData] = useState<Record<number, any>>({});
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [savingGrades, setSavingGrades] = useState(false);
+  
   const [isScanning, setIsScanning] = useState(false);
-  const [showAddPelanggaran, setShowAddPelanggaran] = useState(false);
   const [cameraError, setCameraError] = useState('');
 
   // AI Chat
@@ -36,18 +59,22 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
   
   const hasTrashRole = true;
 
-  // Determine Avatar based on name (Simple check)
+  // Determine Avatar based on name (Simple check for Islami 2D Icons)
   const isFemale = user.user_metadata?.name?.toLowerCase().includes('siti') || 
                    user.user_metadata?.name?.toLowerCase().includes('rina') || 
-                   user.user_metadata?.name?.toLowerCase().includes('ibu');
+                   user.user_metadata?.name?.toLowerCase().includes('ibu') ||
+                   user.user_metadata?.name?.toLowerCase().includes('nur');
                    
   const avatarUrl = isFemale 
     ? "https://cdn-icons-png.flaticon.com/512/4202/4202835.png" // Hijab Avatar
     : "https://cdn-icons-png.flaticon.com/512/4202/4202843.png"; // Male Muslim Avatar
 
-  // Mock Progress Data
+  // Progress Data Calculation
   const weeklyJPTarget = 24;
-  const currentJP = 18;
+  const currentJP = mySchedule.reduce((acc, curr) => {
+      const matches = curr.time.match(/\d+/g);
+      return acc + (matches ? matches.length : 0);
+  }, 0);
   const jpPercentage = Math.round((currentJP / weeklyJPTarget) * 100);
 
   // INITIAL LOAD EFFECT
@@ -57,10 +84,97 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch Schedule from Supabase
+  useEffect(() => {
+      const fetchSchedule = async () => {
+          setLoadingSchedule(true);
+          const { data } = await supabase
+              .from('schedules')
+              .select('*')
+              .eq('teacher_name', user.user_metadata?.name);
+          
+          if (data) {
+              setMySchedule(data);
+          }
+          setLoadingSchedule(false);
+      };
+      
+      if (user.user_metadata?.name) {
+          fetchSchedule();
+      }
+  }, [user]);
+
+  // Fetch Students & Grades for Input Nilai
+  useEffect(() => {
+      if (activeFeature === 'nilai') {
+          fetchStudentsAndGrades();
+      }
+  }, [activeFeature, inputNilaiClass, selectedSubject]);
+
+  const fetchStudentsAndGrades = async () => {
+      setLoadingGrades(true);
+      // 1. Fetch Students
+      const { data: sData } = await supabase.from('students').select('*').eq('class_name', inputNilaiClass).order('name');
+      if (sData) setStudents(sData);
+      else setStudents(MOCK_STUDENTS_FALLBACK); // Fallback if no db connection
+
+      // 2. Fetch Grades
+      const { data: gData } = await supabase.from('grades')
+          .select('*')
+          .eq('class_name', inputNilaiClass)
+          .eq('subject', selectedSubject);
+          
+      const map: any = {};
+      if (gData) {
+          gData.forEach((g: any) => {
+              map[g.student_id] = g;
+          });
+      }
+      setGradesData(map);
+      setLoadingGrades(false);
+  };
+
+  const handleGradeChange = (studentId: number, field: 'ph'|'pts'|'pas', value: string) => {
+      setGradesData(prev => ({
+          ...prev,
+          [studentId]: {
+              ...prev[studentId],
+              [field]: parseInt(value) || 0
+          }
+      }));
+  };
+
+  const saveGrades = async () => {
+      setSavingGrades(true);
+      const updates = students.map(s => ({
+          student_id: s.id,
+          student_name: s.name,
+          class_name: inputNilaiClass,
+          subject: selectedSubject,
+          ph: gradesData[s.id]?.ph || 0,
+          pts: gradesData[s.id]?.pts || 0,
+          pas: gradesData[s.id]?.pas || 0,
+          // Use existing ID if available to update, otherwise insert
+          ...(gradesData[s.id]?.id ? { id: gradesData[s.id].id } : {})
+      }));
+
+      // Upsert: Insert or Update based on ID (or constraint if we had one set up properly in SQL)
+      // Since we added unique(student_id, subject) in SQL, upsert works well.
+      const { error } = await supabase.from('grades').upsert(updates, { onConflict: 'student_id,subject' }); 
+      
+      if (error) {
+          alert("Error menyimpan nilai: " + getErrorMessage(error));
+      } else {
+          alert("Nilai berhasil disimpan!");
+          fetchStudentsAndGrades(); // Refresh IDs
+      }
+      setSavingGrades(false);
+  }
+
   // Updated Menu Grid - Aesthetic 3D Style
   const menuItems = [
       { id: 'jurnal', label: 'Isi Jurnal', icon: FilePenLine, color: 'from-blue-400 to-blue-600', shadow: 'shadow-blue-200' },
-      { id: 'jadwal', label: 'Jadwal Ku', icon: CalendarRange, color: 'from-cyan-400 to-cyan-600', shadow: 'shadow-cyan-200' }, // New
+      { id: 'jadwal', label: 'Jadwal Ku', icon: CalendarRange, color: 'from-cyan-400 to-cyan-600', shadow: 'shadow-cyan-200' }, // New Feature
       { id: 'nilai', label: 'Input Nilai', icon: Calculator, color: 'from-teal-400 to-teal-600', shadow: 'shadow-teal-200' },
       
       { id: 'presensi_qr', label: 'Scan Absensi', icon: QrCode, color: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-200' },
@@ -119,6 +233,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
 
     switch (activeFeature) {
         case 'jadwal':
+            // Group Schedule by Day
+            const groupedSchedule: any = { Senin: [], Selasa: [], Rabu: [], Kamis: [], Jumat: [], Sabtu: [] };
+            mySchedule.forEach(s => {
+                if (groupedSchedule[s.day]) {
+                    groupedSchedule[s.day].push(s);
+                }
+            });
+
             return (
                 <div className="space-y-6">
                     <FeatureHeader title="Jadwal Mengajar & Target" icon={CalendarRange} color="from-cyan-500 to-blue-600" />
@@ -145,31 +267,118 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
                     </div>
 
                     {/* Weekly Schedule Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {[
-                            { day: 'Senin', items: [{ time: '07:00 - 08:10', cls: '5A', subj: 'Upacara & Tematik' }, { time: '08:10 - 09:20', cls: '5A', subj: 'Matematika' }] },
-                            { day: 'Selasa', items: [{ time: '07:00 - 08:10', cls: '4B', subj: 'Matematika' }, { time: '09:30 - 11:00', cls: '5A', subj: 'IPA' }] },
-                            { day: 'Rabu', items: [{ time: '07:00 - 09:20', cls: '5A', subj: 'Bahasa Indonesia' }] },
-                            { day: 'Kamis', items: [{ time: '08:00 - 10:00', cls: '6A', subj: 'Matematika' }] },
-                            { day: 'Jumat', items: [{ time: '07:00 - 08:30', cls: '5A', subj: 'Senam & Bersih Diri' }] },
-                            { day: 'Sabtu', items: [{ time: '07:00 - 09:00', cls: 'All', subj: 'Ekstrakurikuler' }] },
-                        ].map((d, i) => (
-                            <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                                <div className={`px-4 py-2 font-bold text-white ${d.day === 'Senin' ? 'bg-cyan-600' : 'bg-slate-400'}`}>{d.day}</div>
-                                <div className="p-4 space-y-3">
-                                    {d.items.map((item, idx) => (
-                                        <div key={idx} className="flex gap-3 items-start border-b border-slate-50 last:border-0 pb-2 last:pb-0">
-                                            <div className="w-12 text-[10px] font-bold text-slate-500 bg-slate-50 p-1 rounded text-center">{item.time.split(' - ')[0]}</div>
-                                            <div>
-                                                <div className="font-bold text-slate-800 text-sm">{item.subj}</div>
-                                                <div className="text-xs text-slate-500">Kelas {item.cls}</div>
+                    {loadingSchedule ? (
+                        <div className="text-center py-10"><Loader2 className="w-10 h-10 animate-spin text-cyan-600 mx-auto"/></div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {Object.keys(groupedSchedule).map((day) => (
+                                <div key={day} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                    <div className={`px-4 py-2 font-bold text-white ${day === 'Senin' ? 'bg-cyan-600' : 'bg-slate-400'}`}>{day}</div>
+                                    <div className="p-4 space-y-3">
+                                        {groupedSchedule[day].length > 0 ? groupedSchedule[day].map((item: any, idx: number) => (
+                                            <div key={idx} className="flex gap-3 items-start border-b border-slate-50 last:border-0 pb-2 last:pb-0">
+                                                <div className="w-16 text-[10px] font-bold text-slate-500 bg-slate-50 p-1 rounded text-center">{item.time}</div>
+                                                <div>
+                                                    <div className="font-bold text-slate-800 text-sm">{item.subject}</div>
+                                                    <div className="text-xs text-slate-500">Kelas {item.class_name}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {d.items.length === 0 && <div className="text-xs text-slate-300 italic">Tidak ada jadwal</div>}
+                                        )) : <div className="text-xs text-slate-300 italic">Tidak ada jadwal</div>}
+                                    </div>
                                 </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+
+        case 'nilai':
+            return (
+                <div className="space-y-6">
+                    <FeatureHeader title="Input Nilai Siswa" icon={Calculator} color="from-teal-400 to-teal-600" />
+                    
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+                        {/* Toolbar */}
+                        <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-6">
+                            <div className="flex gap-2 w-full md:w-auto">
+                                <select 
+                                    value={inputNilaiClass}
+                                    onChange={(e) => setInputNilaiClass(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none w-1/2 md:w-auto"
+                                >
+                                    {['1A','2A','3A','4A','5A','6A'].map(c => <option key={c} value={c}>Kelas {c}</option>)}
+                                </select>
+                                <select 
+                                    value={selectedSubject}
+                                    onChange={(e) => setSelectedSubject(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none w-1/2 md:w-auto"
+                                >
+                                    {STANDARD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
                             </div>
-                        ))}
+                            <button 
+                                onClick={saveGrades}
+                                disabled={savingGrades}
+                                className="bg-teal-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-teal-700 flex items-center gap-2 w-full md:w-auto justify-center"
+                            >
+                                {savingGrades ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                                Simpan Nilai
+                            </button>
+                        </div>
+
+                        {/* Grade Table */}
+                        <div className="overflow-x-auto">
+                            {loadingGrades ? (
+                                <div className="text-center py-10"><Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto"/></div>
+                            ) : (
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 text-slate-500">
+                                        <tr>
+                                            <th className="p-3 text-left rounded-l-xl">Nama Siswa</th>
+                                            <th className="p-3 text-center w-24">PH</th>
+                                            <th className="p-3 text-center w-24">PTS</th>
+                                            <th className="p-3 text-center w-24 rounded-r-xl">PAS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {students.length === 0 ? (
+                                            <tr><td colSpan={4} className="text-center py-6 text-slate-400">Tidak ada siswa di kelas ini.</td></tr>
+                                        ) : students.map((s) => (
+                                            <tr key={s.id} className="group hover:bg-slate-50/50">
+                                                <td className="p-3 font-bold text-slate-700">{s.name}</td>
+                                                <td className="p-2">
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-center font-bold focus:border-teal-500 outline-none" 
+                                                        placeholder="0"
+                                                        value={gradesData[s.id]?.ph || ''}
+                                                        onChange={(e) => handleGradeChange(s.id, 'ph', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-center font-bold focus:border-teal-500 outline-none" 
+                                                        placeholder="0"
+                                                        value={gradesData[s.id]?.pts || ''}
+                                                        onChange={(e) => handleGradeChange(s.id, 'pts', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-center font-bold focus:border-teal-500 outline-none" 
+                                                        placeholder="0"
+                                                        value={gradesData[s.id]?.pas || ''}
+                                                        onChange={(e) => handleGradeChange(s.id, 'pas', e.target.value)}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -212,12 +421,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
                  </div>
              );
 
+        // ... (Keep existing cases: keterlaksanaan_kbm, kedisiplinan, laporan) ...
         case 'keterlaksanaan_kbm':
             return (
                 <div className="space-y-6">
                     <FeatureHeader title="Monitoring KBM Realtime" icon={ClipboardCheck} color="from-amber-400 to-orange-500" />
-                    
-                    {/* Top Performance */}
                     <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-6 rounded-3xl border border-orange-100 flex items-center justify-between shadow-sm relative overflow-hidden">
                         <div className="relative z-10">
                             <div className="text-xs font-bold text-orange-600 uppercase mb-2 bg-orange-100 inline-block px-2 py-1 rounded-lg">🔥 Top Performance (Rajin Isi Jurnal)</div>
@@ -237,8 +445,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
                             </div>
                         </div>
                     </div>
-
-                    {/* Live Feed */}
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                         <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><ListChecks className="w-5 h-5"/> Update Hari Ini</h4>
                         <div className="space-y-4">
@@ -274,18 +480,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
                 </div>
             );
 
-        case 'laporan': // Cetak Jurnal
+        case 'laporan': 
              return (
                  <div className="space-y-6">
                      <FeatureHeader title="Cetak Jurnal KBM" icon={Printer} color="from-gray-600 to-slate-700" />
-                     
-                     {/* Preview Container (A4 Aspect Ratio Approximation) */}
                      <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200 max-w-2xl mx-auto text-slate-900 font-serif text-sm relative">
                          <div className="absolute top-4 right-4 no-print">
                              <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-sans font-bold text-xs shadow-md hover:bg-blue-700 flex items-center gap-2"><Printer className="w-4 h-4"/> Cetak PDF</button>
                          </div>
-
-                         {/* KOP SURAT */}
                          <div className="flex items-center border-b-2 border-black pb-4 mb-6 gap-4">
                              <img src="https://i.imghippo.com/files/kldd1383bkc.png" className="w-20 h-20 object-contain" alt="Logo" />
                              <div className="text-center flex-1">
@@ -294,19 +496,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
                                  <p className="text-xs italic">Jl. Raya Baujeng No. 1, Kec. Beji, Kab. Pasuruan, Jawa Timur</p>
                              </div>
                          </div>
-
-                         {/* Content */}
                          <div className="text-center mb-6">
                              <h4 className="font-bold text-lg underline uppercase">JURNAL KEGIATAN BELAJAR MENGAJAR</h4>
                              <p className="text-sm">Bulan: Maret 2026</p>
                          </div>
-
                          <div className="mb-4 text-xs font-bold">
                              <p>Nama Guru : {user.user_metadata?.name}</p>
                              <p>NIP : 1928371928</p>
                              <p>Kelas : 5A</p>
                          </div>
-
                          <table className="w-full border-collapse border border-black text-xs mb-8">
                              <thead>
                                  <tr className="bg-gray-100">
@@ -332,11 +530,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
                                      <td className="border border-black p-2 text-center">30/30</td>
                                      <td className="border border-black p-2 text-center">Tuntas</td>
                                  </tr>
-                                 {/* More rows... */}
                              </tbody>
                          </table>
-
-                         {/* Signatures */}
                          <div className="flex justify-between text-xs mt-12 px-8">
                              <div className="text-center">
                                  <p>Mengetahui,</p>
@@ -475,21 +670,20 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout, onN
                   </div>
                   <div className="p-6">
                       <div className="space-y-4">
-                          <div className="flex gap-4 items-start p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                              <div className="bg-blue-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0">07</div>
-                              <div>
-                                  <h4 className="font-bold text-slate-800">Matematika - Kelas 5A</h4>
-                                  <p className="text-xs text-slate-500">Jam Ke-1 s/d 2 (07:00 - 08:10)</p>
-                                  <span className="inline-block mt-2 px-2 py-1 bg-white text-blue-600 text-[10px] font-bold rounded border border-blue-200">Sedang Berlangsung</span>
-                              </div>
-                          </div>
-                          <div className="flex gap-4 items-start p-4 bg-slate-50 rounded-2xl border border-slate-100 opacity-70">
-                              <div className="bg-slate-300 text-slate-500 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0">09</div>
-                              <div>
-                                  <h4 className="font-bold text-slate-800">Tematik - Kelas 5A</h4>
-                                  <p className="text-xs text-slate-500">Jam Ke-3 s/d 4 (08:10 - 09:20)</p>
-                              </div>
-                          </div>
+                          {/* Filter Schedule for Current Day (Mocked as Monday/Senin for demo if actual day not found or handle logic) */}
+                          {mySchedule.filter((s: any) => s.day === new Date().toLocaleDateString('id-ID', { weekday: 'long' })).length > 0 ? (
+                              mySchedule.filter((s: any) => s.day === new Date().toLocaleDateString('id-ID', { weekday: 'long' })).map((item: any, idx: number) => (
+                                  <div key={idx} className="flex gap-4 items-start p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                      <div className="bg-blue-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 px-1 text-center">{item.time.replace('Jam Ke-', '')}</div>
+                                      <div>
+                                          <h4 className="font-bold text-slate-800">{item.subject}</h4>
+                                          <p className="text-xs text-slate-500">Kelas {item.class_name}</p>
+                                      </div>
+                                  </div>
+                              ))
+                          ) : (
+                             <div className="text-center text-slate-500 py-4">Tidak ada jadwal mengajar hari ini.</div>
+                          )}
                       </div>
                       <button onClick={() => setShowSchedulePopup(false)} className="w-full mt-6 py-3 bg-[#0F2167] text-white font-bold rounded-xl hover:bg-blue-900 transition-colors shadow-lg">
                           Mengerti, Tutup

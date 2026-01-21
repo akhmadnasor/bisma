@@ -1,3 +1,4 @@
+
 export interface Teacher {
   id: string;
   nip: string;
@@ -51,25 +52,74 @@ export interface DashboardStats {
 }
 
 // --- NEW TYPES ---
+export interface WasteType {
+  id: number;
+  name: string; // e.g. "Plastik Gelas", "Kertas Putih"
+  price_per_kg: number;
+}
+
 export interface TrashTransaction {
   id: number;
   date: string;
   student_name: string;
-  type: string; // Plastik, Kertas, dll
+  type: string; // Plastik, Kertas, atau "Penarikan", "Pembelian ATK"
   weight: number;
-  amount: number;
-  status: 'Deposit' | 'Withdraw';
+  amount: number; // Rupiah
+  status: 'Deposit' | 'Withdraw' | 'Purchase';
+  description?: string;
+}
+
+export interface PermissionRequest {
+  id: number;
+  student_name: string;
+  class_name: string;
+  type: 'Sakit' | 'Izin';
+  date: string;
+  reason: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  created_at: string;
+}
+
+export interface GoodDeedRequest {
+  id: number;
+  student_name: string;
+  class_name: string;
+  activity: string; // e.g. "Sholat Dhuha"
+  date: string;
+  time: string;
+  status: 'Pending' | 'Verified' | 'Rejected';
+  image_url?: string;
 }
 
 export interface AppConfig {
+  id?: number;
   appName: string;
   schoolName: string;
+  principalName: string; 
+  principalNip: string; 
+  
   logoUrl1x1: string;
   logoUrl3x4: string;
   logoUrl4x3: string;
   letterHeadUrl: string; // Kop Surat
-  announcementColor: 'yellow' | 'blue' | 'green' | 'pink' | 'purple'; // New Field
+  
+  // Announcement Config
+  announcementTitle: string;     // Judul (misal: Rapat Wali Murid)
+  announcementType: string;      // Jenis (misal: Akademik, Keagamaan)
+  announcementDate: string;      // Tanggal Kegiatan
+  announcementTime: string;      // Waktu (08:00 - Selesai)
+  announcementDesc: string;      // Deskripsi Singkat
+  announcementColor: 'yellow' | 'blue' | 'green' | 'pink' | 'purple'; 
+  
+  // Grade Config
+  phCount: number; // Jumlah Sub PH (PH1, PH2...)
+
   customMenus: { label: string; url: string; icon: string }[];
+  // API Configs
+  gemini_api_key?: string;
+  supabase_url?: string;
+  supabase_anon_key?: string;
+  service_role_key?: string;
 }
 
 export interface Task {
@@ -81,4 +131,15 @@ export interface Task {
   deadline: string;
   link?: string;
   status: 'New' | 'Submitted';
+}
+
+export interface Grade {
+  id?: number;
+  student_id: number;
+  student_name: string;
+  class_name: string;
+  subject: string;
+  ph_scores: number[]; // Array of scores based on phCount
+  pts: number; // STS
+  pas: number; // ASTS
 }

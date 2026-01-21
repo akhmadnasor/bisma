@@ -1,30 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
-import { ArrowRight, User, Lock, ShieldCheck, Home, Search, Info } from 'lucide-react';
+import { User, Lock, ShieldCheck, Home, Search, Info } from 'lucide-react';
 
 interface LoginProps {
   onSuccess: (user: any) => void;
 }
-
-// --- MOCK AUTH DATA ---
-const MOCK_TEACHERS = [
-  { nip: '198001012005012001', password: 'guru', name: 'Hj. Siti Aminah' },
-  { nip: '197502022000031002', password: 'guru', name: 'Drs. Supriyanto' },
-  { nip: '199003032019032005', password: 'guru', name: 'Rina Wati, S.Pd' },
-  { nip: '198504042010011003', password: 'guru', name: 'Bambang Gentolet' },
-  { nip: '12345', password: '1', name: 'Guru Tes' }, // Added Test Account
-  { nip: 'user', password: 'user', name: 'Guru Demo' } // Fallback
-];
-
-const MOCK_STUDENTS = [
-  { nisn: '304910293', password: 'siswa', name: 'Ahmad Dahlan', class: '5A' },
-  { nisn: '304910294', password: 'siswa', name: 'Budi Santoso', class: '5A' },
-  { nisn: '304910295', password: 'siswa', name: 'Citra Kirana', class: '4B' },
-  { nisn: '304910296', password: 'siswa', name: 'Dewi Sartika', class: '6A' },
-  { nisn: '304910297', password: 'siswa', name: 'Eko Patrio', class: '3A' },
-  { nisn: '2345', password: '1', name: 'Siswa Tes', class: '5A' }, // Added Test Account
-  { nisn: 'siswa', password: 'siswa', name: 'Siswa Demo', class: '5A' } // Fallback
-];
 
 const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const [identifier, setIdentifier] = useState(''); // Email / NIP / NISN
@@ -37,83 +17,87 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     setLoading(true);
     setError('');
 
-    // Simulate Network Delay
-    setTimeout(async () => {
-        // 1. Super Admin
+    try {
+        // 1. Super Admin (Hardcoded for Safety/Recovery)
         if ((identifier === 'superadmin' || identifier === 'supermadmin') && password === 'admin') {
             onSuccess({
-            id: 'super-admin-id',
-            role: 'superadmin',
-            email: 'superadmin@bisma.id',
-            user_metadata: { name: 'IT Super Administrator' },
+                id: 'super-admin-id',
+                role: 'superadmin',
+                email: 'superadmin@bisma.id',
+                user_metadata: { name: 'IT Super Administrator' },
             });
-            setLoading(false);
             return;
         }
 
-        // 2. Admin Sekolah (TU)
+        // 2. Admin Sekolah (TU) (Hardcoded or could be in DB)
         if (identifier === 'admin' && password === 'admin') {
             onSuccess({
-            id: 'admin-school-id',
-            role: 'admin',
-            email: 'admin@sekolah.id',
-            user_metadata: { name: 'Tata Usaha SDN Baujeng 1' },
+                id: 'admin-school-id',
+                role: 'admin',
+                email: 'admin@sekolah.id',
+                user_metadata: { name: 'Tata Usaha SDN Baujeng 1' },
             });
-            setLoading(false);
             return;
         }
 
-        // 3. Cek Guru (By NIP)
-        const teacher = MOCK_TEACHERS.find(t => t.nip === identifier && t.password === password);
-        if (teacher) {
+        // 3. Cek Database GURU (Teachers Table)
+        // Kita cek apakah NIP dan Password cocok di tabel public.teachers
+        const { data: teacher, error: teacherError } = await supabase
+            .from('teachers')
+            .select('*')
+            .eq('nip', identifier)
+            .eq('password', password) // Note: In production, hash this!
+            .eq('status', 'Active')
+            .single();
+
+        if (teacher && !teacherError) {
             onSuccess({
-                id: `teacher-${teacher.nip}`,
+                id: teacher.id.toString(), // Use DB ID
                 role: 'teacher',
                 email: `${teacher.nip}@sekolah.id`,
-                user_metadata: { name: teacher.name },
-                profile: { name: teacher.name, nip: teacher.nip }
+                user_metadata: { 
+                    name: teacher.name,
+                    nip: teacher.nip 
+                },
+                profile: teacher 
             });
-            setLoading(false);
             return;
         }
 
-        // 4. Cek Siswa (By NISN)
-        const student = MOCK_STUDENTS.find(s => s.nisn === identifier && s.password === password);
-        if (student) {
+        // 4. Cek Database SISWA (Students Table)
+        // Kita cek apakah NISN dan Password cocok di tabel public.students
+        const { data: student, error: studentError } = await supabase
+            .from('students')
+            .select('*')
+            .eq('nisn', identifier)
+            .eq('password', password)
+            .eq('status', 'Active')
+            .single();
+
+        if (student && !studentError) {
             onSuccess({
-                id: `student-${student.nisn}`,
+                id: student.id.toString(),
                 role: 'student',
                 email: `${student.nisn}@siswa.id`,
-                user_metadata: { name: student.name, class_name: student.class },
+                user_metadata: { 
+                    name: student.name, 
+                    class_name: student.class_name,
+                    nisn: student.nisn
+                },
+                profile: student
             });
-            setLoading(false);
             return;
         }
 
-        // 5. Fallback: Try Supabase Real Auth
-        try {
-            const { data, error: authError } = await supabase.auth.signInWithPassword({
-                email: identifier,
-                password,
-            });
+        // 5. Jika tidak ditemukan di manapun
+        throw new Error('Username atau Password salah.');
 
-            if (authError) throw authError;
-
-            if (data.user) {
-                const { data: profile } = await supabase
-                .from('teachers')
-                .select('*')
-                .eq('id', data.user.id)
-                .single();
-                
-                onSuccess({ ...data.user, profile, role: 'teacher' });
-            }
-        } catch (err: any) {
-            setError('Login gagal. Periksa Username/NIP/NISN dan Password.');
-        } finally {
-            setLoading(false);
-        }
-    }, 800);
+    } catch (err: any) {
+        console.error("Login Error:", err);
+        setError('Login gagal. Periksa Username/NIP/NISN dan Password.');
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -126,7 +110,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
         
         {/* LOGO SECTION - STANDALONE */}
         <div className="mb-8 relative z-20">
-            {/* Logo Image with Gold Shimmer Animation - No Background Box */}
+            {/* Logo Image with Gold Shimmer Animation */}
             <img
                 src="https://i.imghippo.com/files/kldd1383bkc.png"
                 alt="Logo Sekolah"
@@ -150,7 +134,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                         </div>
                         <input
                             type="text"
-                            placeholder="Username / NIP / NISN"
+                            placeholder="NIP (Guru) / NISN (Siswa)"
                             className="w-full pl-11 pr-4 py-4 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-dark font-bold text-sm placeholder-gray-400"
                             value={identifier}
                             onChange={(e) => setIdentifier(e.target.value)}
@@ -200,7 +184,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             <div className="mt-8 text-center space-y-3 relative z-10">
                 <p className="text-[10px] text-gray-400 font-medium">© 2026 SDN Baujeng 1</p>
                 <div className="inline-block px-4 py-1.5 bg-gray-50 rounded-full border border-gray-100">
-                      <p className="text-[10px] text-gray-400 font-medium">Akun Tes: <span className="font-bold text-primary">12345</span> • <span className="font-bold text-primary">2345</span></p>
+                     <p className="text-[10px] text-gray-400 font-medium">Masuk menggunakan Data Sekolah</p>
                 </div>
             </div>
         </div>

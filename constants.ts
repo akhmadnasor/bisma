@@ -1,5 +1,10 @@
 export const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
+export const STANDARD_SUBJECTS = [
+    'Matematika', 'Bahasa Indonesia', 'IPA', 'IPS', 'PPKn', 
+    'PAI', 'PJOK', 'Seni Budaya', 'Bahasa Inggris', 'Tematik', 'Bahasa Daerah'
+];
+
 // Colors updated to match: #5865F2 (Blue), #57F287 (Green), #FEE75C (Yellow), #EB459E (Pink), #ED4245 (Red)
 export const MENU_ITEMS = [
   { id: 'jurnal', label: 'Isi Jurnal', icon: 'FilePenLine', color: 'text-[#5865F2]' }, // Brand Blue
